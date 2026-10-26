@@ -1,13 +1,12 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync } from 'node:fs';
-import { extname, resolve } from 'node:path';
+import { extname } from 'node:path';
 import multer from 'multer';
+import { getUploadDirectory } from '../config/uploads.js';
 import { BadRequestError } from '../utils/errors.js';
 
-const uploadDir = resolve(process.env.UPLOAD_DIR || './uploads');
-if (!existsSync(uploadDir)) {
-  mkdirSync(uploadDir, { recursive: true });
-}
+const uploadDir = getUploadDirectory();
+if (!existsSync(uploadDir)) mkdirSync(uploadDir, { recursive: true });
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);

@@ -1,9 +1,9 @@
-import { resolve } from 'node:path';
 import cors from 'cors';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import { getUploadDirectory } from './src/config/uploads.js';
 import { errorHandler } from './src/middleware/errorHandler.js';
 import { notFoundHandler } from './src/middleware/notFound.js';
 import apiRouter from './src/routes/index.js';
@@ -28,7 +28,7 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 // Static uploads serving (opsional untuk asset frontend)
-const uploadDir = resolve(process.env.UPLOAD_DIR || './uploads');
+const uploadDir = getUploadDirectory();
 app.use('/uploads', express.static(uploadDir));
 
 app.use(

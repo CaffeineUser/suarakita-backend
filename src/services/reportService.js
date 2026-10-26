@@ -1,6 +1,7 @@
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { getSharedDatabase } from '../config/database.js';
+import { getUploadDirectory } from '../config/uploads.js';
 import { categoryRepository } from '../repositories/categoryRepository.js';
 import { reportRepository } from '../repositories/reportRepository.js';
 import { statusHistoryRepository } from '../repositories/statusHistoryRepository.js';
@@ -13,7 +14,7 @@ import {
 } from '../utils/errors.js';
 import { calculatePriorityScore } from '../utils/priority.js';
 
-const uploadDir = resolve(process.env.UPLOAD_DIR || './uploads');
+const uploadDir = getUploadDirectory();
 
 // Transisi status yang sah sesuai AGENTS.md dan README
 const ALLOWED_STATUS_TRANSITIONS = {
