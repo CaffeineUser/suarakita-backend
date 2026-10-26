@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 import bcrypt from 'bcryptjs';
 import { after, before, test } from 'node:test';
 
@@ -12,15 +11,12 @@ process.env.VERCEL = '1';
 process.env.DATABASE_PATH = join(testDirectory, 'test.sqlite');
 process.env.UPLOAD_DIR = join(testDirectory, 'uploads');
 process.env.JWT_SECRET = 'test-only-secret-that-is-long-enough-for-integration-tests';
-process.env.VERCEL = '1';
 process.env.CLIENT_ORIGIN =
   'http://localhost:5173,https://suarakita-frontend.example.test';
 
-const { default: app } = await import('../app.js');
+const { default: app } = await import('../index.js');
 const { getSharedDatabase } = await import('../src/config/database.js');
-const backendDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const database = getSharedDatabase();
-const schema = readFileSync(join(backendDirectory, 'database', 'schema.sql'), 'utf8');
 
 let server;
 let baseUrl;
@@ -87,7 +83,19 @@ async function createReport({ token = wargaToken, title = 'Laporan Uji Jalan Rus
 }
 
 before(async () => {
-  database.exec(schema);
+  assert.equal(
+    database
+      .prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'users'")
+      .get().count,
+    1,
+    'serverless entry point initializes the database schema',
+  );
+  assert.equal(
+    database.prepare('SELECT COUNT(*) AS count FROM categories').get().count,
+    4,
+    'serverless entry point initializes the default categories',
+  );
+
   const passwordHash = await bcrypt.hash(wargaPassword, 4);
   const adminPasswordHash = await bcrypt.hash(adminPassword, 4);
   const insertUser = database.prepare(
@@ -95,11 +103,9 @@ before(async () => {
   );
   wargaId = Number(insertUser.run('Warga Uji', 'warga@test.local', passwordHash, 'warga').lastInsertRowid);
   adminId = Number(insertUser.run('Admin Uji', 'admin@test.local', adminPasswordHash, 'admin').lastInsertRowid);
-  categoryId = Number(
-    database
-      .prepare('INSERT INTO categories (name, description) VALUES (?, ?)')
-      .run('Jalan Rusak', 'Kategori untuk pengujian').lastInsertRowid,
-  );
+  categoryId = database
+    .prepare("SELECT id FROM categories WHERE name = 'Jalan Rusak'")
+    .get().id;
 
   server = await new Promise((resolveServer) => {
     const listeningServer = app.listen(0, () => resolveServer(listeningServer));

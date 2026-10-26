@@ -1,13 +1,21 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, resolve } from 'node:path';
+import { dirname, isAbsolute, resolve } from 'node:path';
 
 const require = createRequire(import.meta.url);
 let sharedDatabase = null;
 
 export function getDatabase(options = {}) {
+  const configuredDatabasePath = process.env.DATABASE_PATH?.trim();
+  const defaultDatabasePath = process.env.VERCEL
+    ? '/tmp/suarakita.sqlite'
+    : './database/suarakita.sqlite';
   const databasePath = resolve(
-    process.env.DATABASE_PATH || './database/suarakita.sqlite',
+    process.env.VERCEL &&
+      configuredDatabasePath &&
+      !isAbsolute(configuredDatabasePath)
+      ? defaultDatabasePath
+      : configuredDatabasePath || defaultDatabasePath,
   );
 
   mkdirSync(dirname(databasePath), { recursive: true });
