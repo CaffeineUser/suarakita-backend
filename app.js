@@ -10,7 +10,7 @@ import apiRouter from './src/routes/index.js';
 
 const app = express();
 const defaultClientOrigin = process.env.VERCEL
-  ? 'https://suarakita-frontend.vercel.app'
+  ? 'https://ifs24014-pabwe2026-proyek1.vercel.app'
   : 'http://localhost:5173';
 const allowedClientOrigins = [
   defaultClientOrigin,

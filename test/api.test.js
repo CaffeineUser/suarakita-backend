@@ -177,11 +177,19 @@ test('SuaraKita backend API integration', async (t) => {
     );
 
     const deployedFrontendCorsResponse = await fetch(`${baseUrl}/health`, {
-      headers: { Origin: 'https://suarakita-frontend.vercel.app' },
+      headers: { Origin: 'https://ifs24014-pabwe2026-proyek1.vercel.app' },
     });
     assert.equal(
       deployedFrontendCorsResponse.headers.get('access-control-allow-origin'),
-      'https://suarakita-frontend.vercel.app',
+      'https://ifs24014-pabwe2026-proyek1.vercel.app',
+    );
+
+    const previousFrontendCorsResponse = await fetch(`${baseUrl}/health`, {
+      headers: { Origin: 'https://suarakita-frontend.vercel.app' },
+    });
+    assert.equal(
+      previousFrontendCorsResponse.headers.get('access-control-allow-origin'),
+      null,
     );
 
     const preflightResponse = await fetch(`${baseUrl}/reports`, {
