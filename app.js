@@ -41,6 +41,10 @@ app.use(
   }),
 );
 
+app.get('/', (_req, res) => {
+  res.redirect(302, '/api/v1/health');
+});
+
 app.use('/api/v1', apiRouter);
 
 // 404 & Centralized Error Handler

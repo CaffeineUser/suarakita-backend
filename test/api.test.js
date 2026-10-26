@@ -116,12 +116,22 @@ after(async () => {
 
 test('SuaraKita backend API integration', async (t) => {
   await t.test('health check, not-found, and error responses', async () => {
+    const rootResponse = await fetch(baseUrl.replace('/api/v1', '/'), {
+      redirect: 'manual',
+    });
+    assert.equal(rootResponse.status, 302);
+    assert.equal(rootResponse.headers.get('location'), '/api/v1/health');
+
     const healthResponse = await fetch(`${baseUrl}/health`);
     assert.equal(healthResponse.status, 200);
     assert.deepEqual((await responseJson(healthResponse)).data, {
       status: 'ok',
       service: 'SuaraKita API',
     });
+
+    const redirectedHealthResponse = await fetch(baseUrl.replace('/api/v1', '/'));
+    assert.equal(redirectedHealthResponse.status, 200);
+    assert.equal((await responseJson(redirectedHealthResponse)).data.status, 'ok');
 
     const missingEndpoint = await fetch(`${baseUrl}/path-tidak-tersedia`);
     await assertApiError(missingEndpoint, 404);
