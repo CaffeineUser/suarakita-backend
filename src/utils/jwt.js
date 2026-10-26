@@ -1,14 +1,21 @@
 import jwt from 'jsonwebtoken';
+import { ServiceUnavailableError } from './errors.js';
 
 function getJwtSecret() {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
+  const secret = process.env.JWT_SECRET?.trim();
+  if (!secret || (process.env.NODE_ENV === 'production' && secret.length < 32)) {
     if (process.env.NODE_ENV === 'production') {
-      throw new Error('JWT_SECRET wajib dikonfigurasi di lingkungan produksi.');
+      throw new ServiceUnavailableError(
+        'Autentikasi belum dikonfigurasi. Atur JWT_SECRET minimal 32 karakter pada environment backend lalu deploy ulang.',
+      );
     }
     return 'dev-secret-key-suarakita-minimum-32-characters-long';
   }
   return secret;
+}
+
+export function validateJwtConfiguration() {
+  getJwtSecret();
 }
 
 export function generateToken(payload, options = {}) {

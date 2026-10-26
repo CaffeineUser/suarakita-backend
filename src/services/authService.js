@@ -1,10 +1,12 @@
 import bcrypt from 'bcryptjs';
 import { userRepository } from '../repositories/userRepository.js';
 import { ConflictError, NotFoundError, UnauthorizedError } from '../utils/errors.js';
-import { generateToken } from '../utils/jwt.js';
+import { generateToken, validateJwtConfiguration } from '../utils/jwt.js';
 
 export const authService = {
   async register({ name, email, password }) {
+    validateJwtConfiguration();
+
     const existingUser = userRepository.findByEmail(email);
     if (existingUser) {
       throw new ConflictError('Email sudah terdaftar. Silakan gunakan email lain atau login.');
@@ -40,6 +42,8 @@ export const authService = {
   },
 
   async login({ email, password }) {
+    validateJwtConfiguration();
+
     const user = userRepository.findByEmail(email);
     if (!user) {
       throw new UnauthorizedError('Email atau kata sandi tidak valid.');

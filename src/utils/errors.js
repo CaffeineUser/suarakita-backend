@@ -38,6 +38,12 @@ export class ConflictError extends AppError {
   }
 }
 
+export class ServiceUnavailableError extends AppError {
+  constructor(message = 'Layanan sementara tidak tersedia.', details = null) {
+    super(message, 503, details);
+  }
+}
+
 export class UnprocessableEntityError extends AppError {
   constructor(message = 'Data yang dikirim tidak dapat diproses.', details = null) {
     super(message, 422, details);

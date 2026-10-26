@@ -368,6 +368,42 @@ test('SuaraKita backend API integration', async (t) => {
     assert.equal(logout.status, 200);
   });
 
+  await t.test('missing production JWT secret fails before registration writes a user', async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalJwtSecret = process.env.JWT_SECRET;
+    process.env.NODE_ENV = 'production';
+    delete process.env.JWT_SECRET;
+
+    try {
+      const registration = await jsonRequest('/auth/register', {
+        method: 'POST',
+        body: {
+          name: 'Pengguna Konfigurasi',
+          email: 'jwt-config-check@test.local',
+          password: 'StrongPassword123!',
+        },
+      });
+      const registrationError = await assertApiError(registration, 503);
+      assert.match(registrationError.error.message, /JWT_SECRET/);
+      assert.equal(
+        database
+          .prepare('SELECT 1 FROM users WHERE email = ?')
+          .get('jwt-config-check@test.local'),
+        undefined,
+      );
+
+      const login = await jsonRequest('/auth/login', {
+        method: 'POST',
+        body: { email: 'warga@test.local', password: wargaPassword },
+      });
+      await assertApiError(login, 503);
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+      if (originalJwtSecret === undefined) delete process.env.JWT_SECRET;
+      else process.env.JWT_SECRET = originalJwtSecret;
+    }
+  });
+
   await t.test('category listing, authorization, CRUD, and conflict handling', async () => {
     const publicCategories = await jsonRequest('/categories');
     assert.equal(publicCategories.status, 200);
