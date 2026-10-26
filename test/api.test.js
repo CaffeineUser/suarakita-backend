@@ -404,6 +404,36 @@ test('SuaraKita backend API integration', async (t) => {
     }
   });
 
+  await t.test('invalid production JWT expiration fails before registration writes a user', async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalJwtExpiresIn = process.env.JWT_EXPIRES_IN;
+    process.env.NODE_ENV = 'production';
+    process.env.JWT_EXPIRES_IN = 'bukan-durasi';
+
+    try {
+      const registration = await jsonRequest('/auth/register', {
+        method: 'POST',
+        body: {
+          name: 'Pengguna Konfigurasi',
+          email: 'jwt-expiry-check@test.local',
+          password: 'StrongPassword123!',
+        },
+      });
+      const registrationError = await assertApiError(registration, 503);
+      assert.match(registrationError.error.message, /JWT_EXPIRES_IN/);
+      assert.equal(
+        database
+          .prepare('SELECT 1 FROM users WHERE email = ?')
+          .get('jwt-expiry-check@test.local'),
+        undefined,
+      );
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+      if (originalJwtExpiresIn === undefined) delete process.env.JWT_EXPIRES_IN;
+      else process.env.JWT_EXPIRES_IN = originalJwtExpiresIn;
+    }
+  });
+
   await t.test('category listing, authorization, CRUD, and conflict handling', async () => {
     const publicCategories = await jsonRequest('/categories');
     assert.equal(publicCategories.status, 200);

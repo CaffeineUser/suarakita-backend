@@ -14,13 +14,29 @@ function getJwtSecret() {
   return secret;
 }
 
+function getJwtExpiresIn() {
+  const expiresIn = process.env.JWT_EXPIRES_IN?.trim() || '1d';
+  if (!/^[1-9]\d*(s|m|h|d)$/i.test(expiresIn)) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ServiceUnavailableError(
+        'JWT_EXPIRES_IN tidak valid. Gunakan durasi positif seperti 1d, 12h, atau 30m.',
+      );
+    }
+    throw new Error(
+      'JWT_EXPIRES_IN tidak valid. Gunakan durasi positif seperti 1d, 12h, atau 30m.',
+    );
+  }
+  return expiresIn;
+}
+
 export function validateJwtConfiguration() {
   getJwtSecret();
+  getJwtExpiresIn();
 }
 
 export function generateToken(payload, options = {}) {
   const secret = getJwtSecret();
-  const expiresIn = options.expiresIn || process.env.JWT_EXPIRES_IN || '1d';
+  const expiresIn = options.expiresIn || getJwtExpiresIn();
   return jwt.sign(payload, secret, { expiresIn, ...options });
 }
 
