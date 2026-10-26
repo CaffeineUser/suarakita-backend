@@ -11,6 +11,8 @@ process.env.NODE_ENV = 'test';
 process.env.DATABASE_PATH = join(testDirectory, 'test.sqlite');
 process.env.UPLOAD_DIR = join(testDirectory, 'uploads');
 process.env.JWT_SECRET = 'test-only-secret-that-is-long-enough-for-integration-tests';
+process.env.CLIENT_ORIGIN =
+  'http://localhost:5173,https://suarakita-frontend.example.test';
 
 const { default: app } = await import('../app.js');
 const { getSharedDatabase } = await import('../src/config/database.js');
@@ -128,6 +130,41 @@ test('SuaraKita backend API integration', async (t) => {
       status: 'ok',
       service: 'SuaraKita API',
     });
+
+    const corsResponse = await fetch(`${baseUrl}/health`, {
+      headers: { Origin: 'https://suarakita-frontend.example.test' },
+    });
+    assert.equal(
+      corsResponse.headers.get('access-control-allow-origin'),
+      'https://suarakita-frontend.example.test',
+    );
+
+    const preflightResponse = await fetch(`${baseUrl}/reports`, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'https://suarakita-frontend.example.test',
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'authorization,content-type',
+      },
+    });
+    assert.equal(preflightResponse.status, 204);
+    assert.equal(
+      preflightResponse.headers.get('access-control-allow-origin'),
+      'https://suarakita-frontend.example.test',
+    );
+    assert.match(
+      preflightResponse.headers.get('access-control-allow-headers'),
+      /authorization/i,
+    );
+    assert.match(
+      preflightResponse.headers.get('access-control-allow-methods'),
+      /POST/i,
+    );
+
+    const deniedCorsResponse = await fetch(`${baseUrl}/health`, {
+      headers: { Origin: 'https://untrusted.example.test' },
+    });
+    assert.equal(deniedCorsResponse.headers.get('access-control-allow-origin'), null);
 
     const redirectedHealthResponse = await fetch(baseUrl.replace('/api/v1', '/'));
     assert.equal(redirectedHealthResponse.status, 200);
