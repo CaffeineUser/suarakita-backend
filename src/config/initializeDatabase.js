@@ -22,10 +22,12 @@ export async function initializeDatabase() {
     readFileSync(resolve(backendDirectory, 'database/seed.sql'), 'utf8'),
   );
 
-  if (
-    process.env.VERCEL &&
-    process.env.SEED_DEMO_ACCOUNTS?.toLowerCase() !== 'false'
-  ) {
+  const seedDemoAccounts =
+    process.env.SEED_DEMO_ACCOUNTS?.toLowerCase() === 'true' ||
+    (process.env.VERCEL &&
+      process.env.SEED_DEMO_ACCOUNTS?.toLowerCase() !== 'false');
+
+  if (seedDemoAccounts) {
     const demoUsers = [
       {
         name: 'Warga Demo',

@@ -36,3 +36,25 @@ test('upload directory respects explicit configuration', () => {
     else process.env.UPLOAD_DIR = originalUploadDir;
   }
 });
+
+test('upload directory uses the persistent deployment mount when configured', () => {
+  const originalVercel = process.env.VERCEL;
+  const originalRender = process.env.RENDER;
+  const originalUploadDir = process.env.UPLOAD_DIR;
+
+  try {
+    delete process.env.VERCEL;
+    process.env.RENDER = 'true';
+    process.env.UPLOAD_DIR = '/var/data/uploads';
+    assert.equal(getUploadDirectory(), resolve('/var/data/uploads'));
+  } finally {
+    if (originalVercel === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = originalVercel;
+
+    if (originalRender === undefined) delete process.env.RENDER;
+    else process.env.RENDER = originalRender;
+
+    if (originalUploadDir === undefined) delete process.env.UPLOAD_DIR;
+    else process.env.UPLOAD_DIR = originalUploadDir;
+  }
+});

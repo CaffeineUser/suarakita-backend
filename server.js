@@ -1,5 +1,8 @@
 import 'dotenv/config';
 import app from './app.js';
+import { initializeDatabase } from './src/config/initializeDatabase.js';
+
+await initializeDatabase();
 
 const port = Number(process.env.PORT) || 3000;
 
