@@ -1,0 +1,54 @@
+import bcrypt from 'bcryptjs';
+import { userRepository } from '../repositories/userRepository.js';
+import { BadRequestError, NotFoundError } from '../utils/errors.js';
+
+export const userService = {
+  async getProfile(userId) {
+    const user = userRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundError('Pengguna tidak ditemukan.');
+    }
+    return user;
+  },
+
+  async updateProfile(userId, { name, current_password, new_password }) {
+    const user = userRepository.findByEmail((await userRepository.findById(userId))?.email);
+    if (!user) {
+      throw new NotFoundError('Pengguna tidak ditemukan.');
+    }
+
+    let passwordHash;
+    if (new_password) {
+      if (!current_password) {
+        throw new BadRequestError('Kata sandi saat ini wajib diisi untuk mengubah kata sandi.');
+      }
+      const isMatch = await bcrypt.compare(current_password, user.password_hash);
+      if (!isMatch) {
+        throw new BadRequestError('Kata sandi saat ini tidak sesuai.');
+      }
+      passwordHash = await bcrypt.hash(new_password, 10);
+    }
+
+    return userRepository.updateProfile(userId, {
+      name,
+      passwordHash,
+    });
+  },
+
+  async getAllUsers({ page = 1, limit = 20 } = {}) {
+    const offset = Math.max(0, (page - 1) * limit);
+    const users = userRepository.findAll({ limit, offset });
+    const total = userRepository.countAll();
+    const totalPages = Math.ceil(total / limit) || (total === 0 ? 0 : 1);
+
+    return {
+      data: users,
+      pagination: {
+        page,
+        limit,
+        total,
+        total_pages: totalPages,
+      },
+    };
+  },
+};
