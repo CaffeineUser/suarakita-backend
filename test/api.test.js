@@ -13,9 +13,13 @@ process.env.UPLOAD_DIR = join(testDirectory, 'uploads');
 process.env.JWT_SECRET = 'test-only-secret-that-is-long-enough-for-integration-tests';
 process.env.CLIENT_ORIGIN =
   'http://localhost:5173,https://suarakita-frontend.example.test';
+process.env.BOOTSTRAP_ADMIN_NAME = 'Admin SuaraKita';
+process.env.BOOTSTRAP_ADMIN_EMAIL = 'admin.bootstrap@test.local';
+process.env.BOOTSTRAP_ADMIN_PASSWORD = 'BootstrapAdminTest123!';
 
 const { default: app } = await import('../index.js');
 const { getSharedDatabase } = await import('../src/config/database.js');
+const { initializeDatabase } = await import('../src/config/initializeDatabase.js');
 const database = getSharedDatabase();
 
 let server;
@@ -83,6 +87,8 @@ async function createReport({ token = wargaToken, title = 'Laporan Uji Jalan Rus
 }
 
 before(async () => {
+  await initializeDatabase();
+
   assert.equal(
     database
       .prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'users'")
@@ -95,6 +101,20 @@ before(async () => {
     4,
     'serverless entry point initializes the default categories',
   );
+  assert.equal(
+    database
+      .prepare('SELECT role FROM users WHERE email = ? COLLATE NOCASE')
+      .get('warga@example.com').role,
+    'warga',
+    'serverless startup seeds the demo resident',
+  );
+  assert.equal(
+    database
+      .prepare('SELECT role FROM users WHERE email = ? COLLATE NOCASE')
+      .get('admin@example.com').role,
+    'admin',
+    'serverless startup seeds the demo admin',
+  );
 
   const passwordHash = await bcrypt.hash(wargaPassword, 4);
   const adminPasswordHash = await bcrypt.hash(adminPassword, 4);
@@ -103,6 +123,13 @@ before(async () => {
   );
   wargaId = Number(insertUser.run('Warga Uji', 'warga@test.local', passwordHash, 'warga').lastInsertRowid);
   adminId = Number(insertUser.run('Admin Uji', 'admin@test.local', adminPasswordHash, 'admin').lastInsertRowid);
+  assert.equal(
+    database
+      .prepare('SELECT COUNT(*) AS count FROM users WHERE email = ? COLLATE NOCASE')
+      .get(process.env.BOOTSTRAP_ADMIN_EMAIL).count,
+    1,
+    'serverless startup seeds the configured admin idempotently',
+  );
   categoryId = database
     .prepare("SELECT id FROM categories WHERE name = 'Jalan Rusak'")
     .get().id;
@@ -243,6 +270,33 @@ test('SuaraKita backend API integration', async (t) => {
     });
     assert.equal(adminLogin.status, 200);
     adminToken = (await responseJson(adminLogin)).data.token;
+
+    const bootstrapAdminLogin = await jsonRequest('/auth/login', {
+      method: 'POST',
+      body: {
+        email: process.env.BOOTSTRAP_ADMIN_EMAIL,
+        password: process.env.BOOTSTRAP_ADMIN_PASSWORD,
+      },
+    });
+    assert.equal(bootstrapAdminLogin.status, 200);
+    assert.equal(
+      (await responseJson(bootstrapAdminLogin)).data.user.role,
+      'admin',
+    );
+
+    const demoResidentLogin = await jsonRequest('/auth/login', {
+      method: 'POST',
+      body: { email: 'warga@example.com', password: 'WargaDemo123!' },
+    });
+    assert.equal(demoResidentLogin.status, 200);
+    assert.equal((await responseJson(demoResidentLogin)).data.user.role, 'warga');
+
+    const demoAdminLogin = await jsonRequest('/auth/login', {
+      method: 'POST',
+      body: { email: 'admin@example.com', password: 'AdminDemo123!' },
+    });
+    assert.equal(demoAdminLogin.status, 200);
+    assert.equal((await responseJson(demoAdminLogin)).data.user.role, 'admin');
 
     const wrongPassword = await jsonRequest('/auth/login', {
       method: 'POST',
