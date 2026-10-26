@@ -20,7 +20,7 @@ const allowedClientOrigins = [
     .filter(Boolean),
 ];
 
-if (process.env.VERCEL || process.env.RENDER) {
+if (process.env.VERCEL) {
   app.set('trust proxy', 1);
 }
 

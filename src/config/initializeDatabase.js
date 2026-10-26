@@ -23,9 +23,7 @@ export async function initializeDatabase() {
   );
 
   const seedDemoAccounts =
-    process.env.SEED_DEMO_ACCOUNTS?.toLowerCase() === 'true' ||
-    (process.env.VERCEL &&
-      process.env.SEED_DEMO_ACCOUNTS?.toLowerCase() !== 'false');
+    process.env.SEED_DEMO_ACCOUNTS?.toLowerCase() === 'true';
 
   if (seedDemoAccounts) {
     const demoUsers = [

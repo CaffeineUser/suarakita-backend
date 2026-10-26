@@ -8,6 +8,7 @@ import { after, before, test } from 'node:test';
 const testDirectory = mkdtempSync(join(tmpdir(), 'suarakita-backend-test-'));
 process.env.NODE_ENV = 'test';
 process.env.VERCEL = '1';
+process.env.SEED_DEMO_ACCOUNTS = 'false';
 process.env.DATABASE_PATH = join(testDirectory, 'test.sqlite');
 process.env.UPLOAD_DIR = join(testDirectory, 'uploads');
 process.env.JWT_SECRET = 'test-only-secret-that-is-long-enough-for-integration-tests';
@@ -104,16 +105,16 @@ before(async () => {
   assert.equal(
     database
       .prepare('SELECT role FROM users WHERE email = ? COLLATE NOCASE')
-      .get('warga@example.com').role,
-    'warga',
-    'serverless startup seeds the demo resident',
+      .get('warga@example.com'),
+    undefined,
+    'serverless startup does not create public demo accounts by default',
   );
   assert.equal(
     database
       .prepare('SELECT role FROM users WHERE email = ? COLLATE NOCASE')
-      .get('admin@example.com').role,
-    'admin',
-    'serverless startup seeds the demo admin',
+      .get('admin@example.com'),
+    undefined,
+    'serverless startup does not create a public demo admin',
   );
 
   const passwordHash = await bcrypt.hash(wargaPassword, 4);
@@ -296,15 +297,13 @@ test('SuaraKita backend API integration', async (t) => {
       method: 'POST',
       body: { email: 'warga@example.com', password: 'WargaDemo123!' },
     });
-    assert.equal(demoResidentLogin.status, 200);
-    assert.equal((await responseJson(demoResidentLogin)).data.user.role, 'warga');
+    await assertApiError(demoResidentLogin, 401);
 
     const demoAdminLogin = await jsonRequest('/auth/login', {
       method: 'POST',
       body: { email: 'admin@example.com', password: 'AdminDemo123!' },
     });
-    assert.equal(demoAdminLogin.status, 200);
-    assert.equal((await responseJson(demoAdminLogin)).data.user.role, 'admin');
+    await assertApiError(demoAdminLogin, 401);
 
     const wrongPassword = await jsonRequest('/auth/login', {
       method: 'POST',
