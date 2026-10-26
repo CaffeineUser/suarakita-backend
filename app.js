@@ -20,6 +20,10 @@ const allowedClientOrigins = [
     .filter(Boolean),
 ];
 
+if (process.env.VERCEL) {
+  app.set('trust proxy', 1);
+}
+
 app.disable('x-powered-by');
 app.use(
   helmet({

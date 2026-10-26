@@ -8,6 +8,7 @@ import { after, before, test } from 'node:test';
 
 const testDirectory = mkdtempSync(join(tmpdir(), 'suarakita-backend-test-'));
 process.env.NODE_ENV = 'test';
+process.env.VERCEL = '1';
 process.env.DATABASE_PATH = join(testDirectory, 'test.sqlite');
 process.env.UPLOAD_DIR = join(testDirectory, 'uploads');
 process.env.JWT_SECRET = 'test-only-secret-that-is-long-enough-for-integration-tests';
@@ -119,6 +120,8 @@ after(async () => {
 
 test('SuaraKita backend API integration', async (t) => {
   await t.test('health check, not-found, and error responses', async () => {
+    assert.equal(app.get('trust proxy'), 1);
+
     const rootResponse = await fetch(baseUrl.replace('/api/v1', '/'), {
       redirect: 'manual',
     });
