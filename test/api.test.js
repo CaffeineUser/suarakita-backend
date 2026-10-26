@@ -11,6 +11,7 @@ process.env.NODE_ENV = 'test';
 process.env.DATABASE_PATH = join(testDirectory, 'test.sqlite');
 process.env.UPLOAD_DIR = join(testDirectory, 'uploads');
 process.env.JWT_SECRET = 'test-only-secret-that-is-long-enough-for-integration-tests';
+process.env.VERCEL = '1';
 process.env.CLIENT_ORIGIN =
   'http://localhost:5173,https://suarakita-frontend.example.test';
 
@@ -137,6 +138,14 @@ test('SuaraKita backend API integration', async (t) => {
     assert.equal(
       corsResponse.headers.get('access-control-allow-origin'),
       'https://suarakita-frontend.example.test',
+    );
+
+    const deployedFrontendCorsResponse = await fetch(`${baseUrl}/health`, {
+      headers: { Origin: 'https://suarakita-frontend.vercel.app' },
+    });
+    assert.equal(
+      deployedFrontendCorsResponse.headers.get('access-control-allow-origin'),
+      'https://suarakita-frontend.vercel.app',
     );
 
     const preflightResponse = await fetch(`${baseUrl}/reports`, {

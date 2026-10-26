@@ -9,6 +9,16 @@ import { notFoundHandler } from './src/middleware/notFound.js';
 import apiRouter from './src/routes/index.js';
 
 const app = express();
+const defaultClientOrigin = process.env.VERCEL
+  ? 'https://suarakita-frontend.vercel.app'
+  : 'http://localhost:5173';
+const allowedClientOrigins = [
+  defaultClientOrigin,
+  ...(process.env.CLIENT_ORIGIN || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+];
 
 app.disable('x-powered-by');
 app.use(
@@ -19,10 +29,7 @@ app.use(
 
 app.use(
   cors({
-    origin: (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
-      .split(',')
-      .map((origin) => origin.trim())
-      .filter(Boolean),
+    origin: allowedClientOrigins,
   }),
 );
 
