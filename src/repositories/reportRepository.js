@@ -1,4 +1,4 @@
-import { getSharedDatabase } from '../config/database.js';
+import { getSharedDatabase, queryAll, queryOne } from '../config/database.js';
 
 const ALLOWED_SORT_COLUMNS = {
   priority_score: 'r.priority_score',
@@ -15,8 +15,51 @@ const ALLOWED_ORDER_DIRECTIONS = {
   DESC: 'DESC',
 };
 
+function supportSelection(currentUserId, args) {
+  if (!currentUserId) {
+    return '0 AS is_supported_by_me';
+  }
+  args.push(currentUserId);
+  return `EXISTS(
+    SELECT 1 FROM report_supports rs_me
+    WHERE rs_me.report_id = r.id AND rs_me.user_id = ?
+  ) AS is_supported_by_me`;
+}
+
+function formatReport(report) {
+  return {
+    ...report,
+    is_supported_by_me: Boolean(report.is_supported_by_me),
+  };
+}
+
+const REPORT_SELECT = `
+  SELECT
+    r.id,
+    r.user_id,
+    u.name AS reporter_name,
+    r.category_id,
+    c.name AS category_name,
+    r.title,
+    r.description,
+    r.location_name,
+    r.latitude,
+    r.longitude,
+    r.photo_path,
+    r.urgency,
+    r.status,
+    r.priority_score,
+    r.created_at,
+    r.updated_at,
+    (SELECT COUNT(*) FROM report_supports rs WHERE rs.report_id = r.id) AS support_count,
+    %SUPPORT_SELECTION%
+  FROM reports r
+  JOIN users u ON r.user_id = u.id
+  JOIN categories c ON r.category_id = c.id
+`;
+
 export const reportRepository = {
-  findAll({
+  async findAll({
     q = null,
     categoryId = null,
     status = null,
@@ -28,99 +71,58 @@ export const reportRepository = {
     currentUserId = null,
   } = {}) {
     const db = getSharedDatabase();
-    const whereConditions = [];
-    const params = [];
-
-    // Optional user support flag param
-    let selectUserSupport = '0 AS is_supported_by_me';
-    const selectParams = [];
-    if (currentUserId) {
-      selectUserSupport = `EXISTS(
-        SELECT 1 FROM report_supports rs_me 
-        WHERE rs_me.report_id = r.id AND rs_me.user_id = ?
-      ) AS is_supported_by_me`;
-      selectParams.push(currentUserId);
-    }
+    const conditions = [];
+    const filterArgs = [];
 
     if (q) {
-      whereConditions.push('(r.title LIKE ? OR r.description LIKE ? OR r.location_name LIKE ?)');
+      conditions.push(
+        '(r.title LIKE ? OR r.description LIKE ? OR r.location_name LIKE ?)',
+      );
       const searchPattern = `%${q}%`;
-      params.push(searchPattern, searchPattern, searchPattern);
+      filterArgs.push(searchPattern, searchPattern, searchPattern);
     }
-
     if (categoryId) {
-      whereConditions.push('r.category_id = ?');
-      params.push(categoryId);
+      conditions.push('r.category_id = ?');
+      filterArgs.push(categoryId);
     }
-
     if (status) {
-      whereConditions.push('r.status = ?');
-      params.push(status);
+      conditions.push('r.status = ?');
+      filterArgs.push(status);
     }
-
     if (urgency) {
-      whereConditions.push('r.urgency = ?');
-      params.push(urgency);
+      conditions.push('r.urgency = ?');
+      filterArgs.push(urgency);
     }
 
-    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
-
-    // Hitung total item untuk pagination
-    const countSql = `
-      SELECT COUNT(*) AS total 
-      FROM reports r
-      ${whereClause}
-    `;
-    const countRow = db.prepare(countSql).get(...params);
-    const total = countRow ? countRow.total : 0;
-
-    // Tentukan order by aman dari allowlist
+    const whereClause = conditions.length
+      ? `WHERE ${conditions.join(' AND ')}`
+      : '';
+    const countRow = await queryOne(
+      db,
+      `SELECT COUNT(*) AS total FROM reports r ${whereClause}`,
+      filterArgs,
+    );
+    const total = countRow?.total ?? 0;
     const sortColumn = ALLOWED_SORT_COLUMNS[sort] || 'r.priority_score';
     const sortDirection = ALLOWED_ORDER_DIRECTIONS[order] || 'DESC';
-
     const offset = Math.max(0, (page - 1) * limit);
-
-    const query = `
-      SELECT 
-        r.id,
-        r.user_id,
-        u.name AS reporter_name,
-        r.category_id,
-        c.name AS category_name,
-        r.title,
-        r.description,
-        r.location_name,
-        r.latitude,
-        r.longitude,
-        r.photo_path,
-        r.urgency,
-        r.status,
-        r.priority_score,
-        r.created_at,
-        r.updated_at,
-        (SELECT COUNT(*) FROM report_supports rs WHERE rs.report_id = r.id) AS support_count,
-        ${selectUserSupport}
-      FROM reports r
-      JOIN users u ON r.user_id = u.id
-      JOIN categories c ON r.category_id = c.id
-      ${whereClause}
-      ORDER BY ${sortColumn} ${sortDirection}, r.id DESC
-      LIMIT ? OFFSET ?
-    `;
-
-    const allParams = [...selectParams, ...params, limit, offset];
-    const data = db.prepare(query).all(...allParams);
-
-    // Konversi is_supported_by_me ke boolean
-    const formattedData = data.map((item) => ({
-      ...item,
-      is_supported_by_me: Boolean(item.is_supported_by_me),
-    }));
-
+    const selectArgs = [];
+    const select = REPORT_SELECT.replace(
+      '%SUPPORT_SELECTION%',
+      supportSelection(currentUserId, selectArgs),
+    );
+    const rows = await queryAll(
+      db,
+      `${select}
+       ${whereClause}
+       ORDER BY ${sortColumn} ${sortDirection}, r.id DESC
+       LIMIT ? OFFSET ?`,
+      [...selectArgs, ...filterArgs, limit, offset],
+    );
     const totalPages = Math.ceil(total / limit) || (total === 0 ? 0 : 1);
 
     return {
-      data: formattedData,
+      data: rows.map(formatReport),
       pagination: {
         page,
         limit,
@@ -130,97 +132,59 @@ export const reportRepository = {
     };
   },
 
-  findById(id, currentUserId = null) {
-    const db = getSharedDatabase();
-    let selectUserSupport = '0 AS is_supported_by_me';
-    const params = [];
-
-    if (currentUserId) {
-      selectUserSupport = `EXISTS(
-        SELECT 1 FROM report_supports rs_me 
-        WHERE rs_me.report_id = r.id AND rs_me.user_id = ?
-      ) AS is_supported_by_me`;
-      params.push(currentUserId);
-    }
-    params.push(id);
-
-    const statement = db.prepare(`
-      SELECT 
-        r.id,
-        r.user_id,
-        u.name AS reporter_name,
-        r.category_id,
-        c.name AS category_name,
-        r.title,
-        r.description,
-        r.location_name,
-        r.latitude,
-        r.longitude,
-        r.photo_path,
-        r.urgency,
-        r.status,
-        r.priority_score,
-        r.created_at,
-        r.updated_at,
-        (SELECT COUNT(*) FROM report_supports rs WHERE rs.report_id = r.id) AS support_count,
-        ${selectUserSupport}
-      FROM reports r
-      JOIN users u ON r.user_id = u.id
-      JOIN categories c ON r.category_id = c.id
-      WHERE r.id = ?
-    `);
-
-    const item = statement.get(...params);
-    if (!item) return null;
-
-    return {
-      ...item,
-      is_supported_by_me: Boolean(item.is_supported_by_me),
-    };
+  async findById(id, currentUserId = null, database = getSharedDatabase()) {
+    const args = [];
+    const select = REPORT_SELECT.replace(
+      '%SUPPORT_SELECTION%',
+      supportSelection(currentUserId, args),
+    );
+    args.push(id);
+    const report = await queryOne(
+      database,
+      `${select} WHERE r.id = ?`,
+      args,
+    );
+    return report ? formatReport(report) : null;
   },
 
-  create({
-    userId,
-    categoryId,
-    title,
-    description,
-    locationName,
-    latitude = null,
-    longitude = null,
-    photoPath,
-    urgency = 'sedang',
-    priorityScore = 30,
-  }, db = null) {
-    const conn = db || getSharedDatabase();
-    const statement = conn.prepare(`
-      INSERT INTO reports (
-        user_id, category_id, title, description, location_name,
-        latitude, longitude, photo_path, urgency, status, priority_score
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'diajukan', ?)
-    `);
-
-    const info = statement.run(
+  async create(
+    {
       userId,
       categoryId,
       title,
       description,
       locationName,
-      latitude,
-      longitude,
+      latitude = null,
+      longitude = null,
       photoPath,
-      urgency,
-      priorityScore,
-    );
-
-    return info.lastInsertRowid;
+      urgency = 'sedang',
+      priorityScore = 30,
+    },
+    database = getSharedDatabase(),
+  ) {
+    const result = await database.execute({
+      sql: `INSERT INTO reports (
+              user_id, category_id, title, description, location_name,
+              latitude, longitude, photo_path, urgency, status, priority_score
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'diajukan', ?)`,
+      args: [
+        userId,
+        categoryId,
+        title,
+        description,
+        locationName,
+        latitude,
+        longitude,
+        photoPath,
+        urgency,
+        priorityScore,
+      ],
+    });
+    return Number(result.lastInsertRowid);
   },
 
-  update(id, fields, db = null) {
-    const conn = db || getSharedDatabase();
-    const setClauses = [];
-    const params = [];
-
+  async update(id, fields, database = getSharedDatabase()) {
     const allowedKeys = [
       'category_id',
       'title',
@@ -233,30 +197,33 @@ export const reportRepository = {
       'photo_path',
       'priority_score',
     ];
+    const setClauses = [];
+    const args = [];
 
     for (const key of allowedKeys) {
       if (fields[key] !== undefined) {
         setClauses.push(`${key} = ?`);
-        params.push(fields[key]);
+        args.push(fields[key]);
       }
     }
-
     if (setClauses.length === 0) {
-      return this.findById(id);
+      return this.findById(id, null, database);
     }
 
-    setClauses.push("updated_at = CURRENT_TIMESTAMP");
-    params.push(id);
-
-    const query = `UPDATE reports SET ${setClauses.join(', ')} WHERE id = ?`;
-    conn.prepare(query).run(...params);
-
-    return this.findById(id);
+    setClauses.push('updated_at = CURRENT_TIMESTAMP');
+    args.push(id);
+    await database.execute({
+      sql: `UPDATE reports SET ${setClauses.join(', ')} WHERE id = ?`,
+      args,
+    });
+    return this.findById(id, null, database);
   },
 
-  delete(id, db = null) {
-    const conn = db || getSharedDatabase();
-    const info = conn.prepare('DELETE FROM reports WHERE id = ?').run(id);
-    return info.changes > 0;
+  async delete(id, database = getSharedDatabase()) {
+    const result = await database.execute({
+      sql: 'DELETE FROM reports WHERE id = ?',
+      args: [id],
+    });
+    return result.rowsAffected > 0;
   },
 };

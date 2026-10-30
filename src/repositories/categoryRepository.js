@@ -1,76 +1,84 @@
-import { getSharedDatabase } from '../config/database.js';
+import { getSharedDatabase, queryAll, queryOne } from '../config/database.js';
+
+const CATEGORY_COLUMNS =
+  'id, name, description, is_active, created_at, updated_at';
 
 export const categoryRepository = {
-  findAll({ onlyActive = false } = {}) {
-    const db = getSharedDatabase();
-    let query = 'SELECT id, name, description, is_active, created_at, updated_at FROM categories';
-    if (onlyActive) {
-      query += ' WHERE is_active = 1';
-    }
-    query += ' ORDER BY name ASC';
-    return db.prepare(query).all();
+  async findAll({ onlyActive = false } = {}) {
+    const query = `SELECT ${CATEGORY_COLUMNS} FROM categories${
+      onlyActive ? ' WHERE is_active = 1' : ''
+    } ORDER BY name ASC`;
+    return queryAll(getSharedDatabase(), query);
   },
 
-  findById(id) {
-    const db = getSharedDatabase();
-    return db.prepare('SELECT id, name, description, is_active, created_at, updated_at FROM categories WHERE id = ?').get(id) || null;
+  async findById(id) {
+    return queryOne(
+      getSharedDatabase(),
+      `SELECT ${CATEGORY_COLUMNS} FROM categories WHERE id = ?`,
+      [id],
+    );
   },
 
-  findByName(name) {
-    const db = getSharedDatabase();
-    return db.prepare('SELECT id, name, description, is_active, created_at, updated_at FROM categories WHERE LOWER(name) = LOWER(?)').get(name) || null;
+  async findByName(name) {
+    return queryOne(
+      getSharedDatabase(),
+      `SELECT ${CATEGORY_COLUMNS} FROM categories WHERE LOWER(name) = LOWER(?)`,
+      [name],
+    );
   },
 
-  create({ name, description }) {
-    const db = getSharedDatabase();
-    const statement = db.prepare(`
-      INSERT INTO categories (name, description)
-      VALUES (?, ?)
-    `);
-    const info = statement.run(name, description ?? null);
-    return this.findById(info.lastInsertRowid);
+  async create({ name, description }) {
+    const result = await getSharedDatabase().execute({
+      sql: 'INSERT INTO categories (name, description) VALUES (?, ?)',
+      args: [name, description ?? null],
+    });
+    return this.findById(Number(result.lastInsertRowid));
   },
 
-  update(id, { name, description, is_active }) {
-    const db = getSharedDatabase();
+  async update(id, { name, description, is_active }) {
     const fields = [];
-    const params = [];
+    const args = [];
 
     if (name !== undefined) {
       fields.push('name = ?');
-      params.push(name);
+      args.push(name);
     }
     if (description !== undefined) {
       fields.push('description = ?');
-      params.push(description);
+      args.push(description);
     }
     if (is_active !== undefined) {
       fields.push('is_active = ?');
-      params.push(is_active ? 1 : 0);
+      args.push(is_active ? 1 : 0);
     }
 
     if (fields.length === 0) {
       return this.findById(id);
     }
 
-    fields.push("updated_at = CURRENT_TIMESTAMP");
-    params.push(id);
-
-    const query = `UPDATE categories SET ${fields.join(', ')} WHERE id = ?`;
-    db.prepare(query).run(...params);
+    fields.push('updated_at = CURRENT_TIMESTAMP');
+    args.push(id);
+    await getSharedDatabase().execute({
+      sql: `UPDATE categories SET ${fields.join(', ')} WHERE id = ?`,
+      args,
+    });
     return this.findById(id);
   },
 
-  delete(id) {
-    const db = getSharedDatabase();
-    const statement = db.prepare('DELETE FROM categories WHERE id = ?');
-    const info = statement.run(id);
-    return info.changes > 0;
+  async delete(id) {
+    const result = await getSharedDatabase().execute({
+      sql: 'DELETE FROM categories WHERE id = ?',
+      args: [id],
+    });
+    return result.rowsAffected > 0;
   },
 
-  countReportsByCategoryId(categoryId) {
-    const db = getSharedDatabase();
-    const row = db.prepare('SELECT COUNT(*) AS total FROM reports WHERE category_id = ?').get(categoryId);
-    return row ? row.total : 0;
+  async countReportsByCategoryId(categoryId) {
+    const row = await queryOne(
+      getSharedDatabase(),
+      'SELECT COUNT(*) AS total FROM reports WHERE category_id = ?',
+      [categoryId],
+    );
+    return row?.total ?? 0;
   },
 };

@@ -1,69 +1,36 @@
-import { existsSync, mkdirSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { dirname, isAbsolute, resolve } from 'node:path';
+import { createClient } from '@libsql/client';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
-const require = createRequire(import.meta.url);
-let sharedDatabase = null;
+let sharedDatabase;
 
-export function getDatabase(options = {}) {
-  const configuredDatabasePath = process.env.DATABASE_PATH?.trim();
-  const defaultDatabasePath = process.env.VERCEL
-    ? '/tmp/suarakita.sqlite'
-    : './database/suarakita.sqlite';
-  const databasePath = resolve(
-    process.env.VERCEL &&
-      configuredDatabasePath &&
-      !isAbsolute(configuredDatabasePath)
-      ? defaultDatabasePath
-      : configuredDatabasePath || defaultDatabasePath,
-  );
-
-  mkdirSync(dirname(databasePath), { recursive: true });
-
-  let database = null;
-
-  // 1. Coba muat better-sqlite3 terlebih dahulu
-  try {
-    const BetterSqlite3 = require('better-sqlite3');
-    database = new BetterSqlite3(databasePath, options);
-  } catch (_err) {
-    // 2. Jika better-sqlite3 native binding tidak ditemukan di sistem Windows (misal Node 24 tanpa build tools),
-    // fallback ke modul bawaan resmi node:sqlite yang tersedia di Node >= 22.5
-    try {
-      const { DatabaseSync } = require('node:sqlite');
-      database = new DatabaseSync(databasePath, options);
-
-      // Adapter method agar kompatibel 100% dengan better-sqlite3
-      if (!database.pragma) {
-        database.pragma = (sql) => {
-          database.exec(`PRAGMA ${sql};`);
-        };
-      }
-
-      if (!database.transaction) {
-        database.transaction = (fn) => {
-          return (...args) => {
-            database.exec('BEGIN');
-            try {
-              const result = fn(...args);
-              database.exec('COMMIT');
-              return result;
-            } catch (error) {
-              database.exec('ROLLBACK');
-              throw error;
-            }
-          };
-        };
-      }
-    } catch (nodeSqliteErr) {
-      throw new Error(
-        `Gagal membuka koneksi database SQLite: ${nodeSqliteErr.message}`,
-      );
+export function getDatabase() {
+  const tursoUrl = process.env.TURSO_DATABASE_URL?.trim();
+  if (tursoUrl) {
+    const authToken = process.env.TURSO_AUTH_TOKEN?.trim();
+    if (!authToken && !tursoUrl.startsWith('file:')) {
+      throw new Error('TURSO_AUTH_TOKEN wajib diatur untuk koneksi database Turso.');
     }
+
+    return createClient({
+      url: tursoUrl,
+      ...(authToken ? { authToken } : {}),
+      intMode: 'number',
+    });
   }
 
-  database.pragma('foreign_keys = ON');
-  return database;
+  const configuredPath = process.env.DATABASE_PATH?.trim();
+  if (process.env.VERCEL && !configuredPath) {
+    throw new Error(
+      'TURSO_DATABASE_URL wajib diatur pada deployment. DATABASE_PATH hanya didukung untuk pengembangan lokal.',
+    );
+  }
+
+  const databasePath = resolve(configuredPath || './database/suarakita.sqlite');
+  return createClient({
+    url: pathToFileURL(databasePath).href,
+    intMode: 'number',
+  });
 }
 
 export function getSharedDatabase() {
@@ -71,6 +38,32 @@ export function getSharedDatabase() {
     sharedDatabase = getDatabase();
   }
   return sharedDatabase;
+}
+
+export async function executeSql(database, sql, args = []) {
+  return database.execute({ sql, args });
+}
+
+export async function queryOne(database, sql, args = []) {
+  const result = await executeSql(database, sql, args);
+  return result.rows[0] ?? null;
+}
+
+export async function queryAll(database, sql, args = []) {
+  const result = await executeSql(database, sql, args);
+  return result.rows;
+}
+
+export async function runInTransaction(database, callback) {
+  const transaction = await database.transaction('write');
+  try {
+    const result = await callback(transaction);
+    await transaction.commit();
+    return result;
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
 }
 
 export default getSharedDatabase;

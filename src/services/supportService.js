@@ -1,4 +1,4 @@
-import { getSharedDatabase } from '../config/database.js';
+import { getSharedDatabase, runInTransaction } from '../config/database.js';
 import { reportRepository } from '../repositories/reportRepository.js';
 import { supportRepository } from '../repositories/supportRepository.js';
 import {
@@ -11,7 +11,7 @@ import { calculatePriorityScore } from '../utils/priority.js';
 
 export const supportService = {
   async addSupport(reportId, userId) {
-    const report = reportRepository.findById(reportId);
+    const report = await reportRepository.findById(reportId);
     if (!report) {
       throw new NotFoundError('Laporan tidak ditemukan.');
     }
@@ -26,7 +26,7 @@ export const supportService = {
       );
     }
 
-    const existingSupport = supportRepository.findUserSupport(reportId, userId);
+    const existingSupport = await supportRepository.findUserSupport(reportId, userId);
     if (existingSupport) {
       throw new ConflictError('Anda sudah memberikan dukungan untuk laporan ini.');
     }
@@ -35,20 +35,18 @@ export const supportService = {
     let newSupportCount = 0;
     let newPriorityScore = 0;
 
-    const runTransaction = db.transaction(() => {
-      supportRepository.create(reportId, userId, db);
-      newSupportCount = supportRepository.countByReportId(reportId, db);
+    await runInTransaction(db, async (transaction) => {
+      await supportRepository.create(reportId, userId, transaction);
+      newSupportCount = await supportRepository.countByReportId(reportId, transaction);
       newPriorityScore = calculatePriorityScore(report.urgency, newSupportCount);
-      reportRepository.update(
+      await reportRepository.update(
         reportId,
         {
           priority_score: newPriorityScore,
         },
-        db,
+        transaction,
       );
     });
-
-    runTransaction();
 
     return {
       message: 'Dukungan berhasil ditambahkan.',
@@ -58,12 +56,12 @@ export const supportService = {
   },
 
   async removeSupport(reportId, userId) {
-    const report = reportRepository.findById(reportId);
+    const report = await reportRepository.findById(reportId);
     if (!report) {
       throw new NotFoundError('Laporan tidak ditemukan.');
     }
 
-    const existingSupport = supportRepository.findUserSupport(reportId, userId);
+    const existingSupport = await supportRepository.findUserSupport(reportId, userId);
     if (!existingSupport) {
       throw new NotFoundError('Anda belum memberikan dukungan untuk laporan ini.');
     }
@@ -72,20 +70,18 @@ export const supportService = {
     let newSupportCount = 0;
     let newPriorityScore = 0;
 
-    const runTransaction = db.transaction(() => {
-      supportRepository.delete(reportId, userId, db);
-      newSupportCount = supportRepository.countByReportId(reportId, db);
+    await runInTransaction(db, async (transaction) => {
+      await supportRepository.delete(reportId, userId, transaction);
+      newSupportCount = await supportRepository.countByReportId(reportId, transaction);
       newPriorityScore = calculatePriorityScore(report.urgency, newSupportCount);
-      reportRepository.update(
+      await reportRepository.update(
         reportId,
         {
           priority_score: newPriorityScore,
         },
-        db,
+        transaction,
       );
     });
-
-    runTransaction();
 
     return {
       message: 'Dukungan berhasil dibatalkan.',
@@ -95,12 +91,12 @@ export const supportService = {
   },
 
   async getSupports(reportId) {
-    const report = reportRepository.findById(reportId);
+    const report = await reportRepository.findById(reportId);
     if (!report) {
       throw new NotFoundError('Laporan tidak ditemukan.');
     }
 
-    const supports = supportRepository.findByReportId(reportId);
+    const supports = await supportRepository.findByReportId(reportId);
     return {
       count: supports.length,
       supports,

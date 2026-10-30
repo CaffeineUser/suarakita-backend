@@ -4,7 +4,7 @@ import { BadRequestError, NotFoundError } from '../utils/errors.js';
 
 export const userService = {
   async getProfile(userId) {
-    const user = userRepository.findById(userId);
+    const user = await userRepository.findById(userId);
     if (!user) {
       throw new NotFoundError('Pengguna tidak ditemukan.');
     }
@@ -12,7 +12,12 @@ export const userService = {
   },
 
   async updateProfile(userId, { name, current_password, new_password }) {
-    const user = userRepository.findByEmail((await userRepository.findById(userId))?.email);
+    const profile = await userRepository.findById(userId);
+    if (!profile) {
+      throw new NotFoundError('Pengguna tidak ditemukan.');
+    }
+
+    const user = await userRepository.findByEmail(profile.email);
     if (!user) {
       throw new NotFoundError('Pengguna tidak ditemukan.');
     }
@@ -37,8 +42,10 @@ export const userService = {
 
   async getAllUsers({ page = 1, limit = 20 } = {}) {
     const offset = Math.max(0, (page - 1) * limit);
-    const users = userRepository.findAll({ limit, offset });
-    const total = userRepository.countAll();
+    const [users, total] = await Promise.all([
+      userRepository.findAll({ limit, offset }),
+      userRepository.countAll(),
+    ]);
     const totalPages = Math.ceil(total / limit) || (total === 0 ? 0 : 1);
 
     return {

@@ -2,16 +2,25 @@ import { userRepository } from '../repositories/userRepository.js';
 import { ForbiddenError, UnauthorizedError } from '../utils/errors.js';
 import { verifyToken } from '../utils/jwt.js';
 
-export function authenticate(req, _res, next) {
+export async function authenticate(req, _res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return next(new UnauthorizedError('Akses ditolak. Token otorisasi tidak ditemukan.'));
   }
 
   const token = authHeader.split(' ')[1];
+  let decoded;
   try {
-    const decoded = verifyToken(token);
-    const user = userRepository.findById(decoded.id);
+    decoded = verifyToken(token);
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return next(new UnauthorizedError('Sesi telah berakhir. Silakan login kembali.'));
+    }
+    return next(new UnauthorizedError('Token tidak valid atau kedaluwarsa.'));
+  }
+
+  try {
+    const user = await userRepository.findById(decoded.id);
     if (!user) {
       return next(new UnauthorizedError('Pengguna tidak ditemukan atau sesi tidak valid.'));
     }
@@ -19,14 +28,11 @@ export function authenticate(req, _res, next) {
     req.user = user;
     next();
   } catch (error) {
-    if (error.name === 'TokenExpiredError') {
-      return next(new UnauthorizedError('Sesi telah berakhir. Silakan login kembali.'));
-    }
-    return next(new UnauthorizedError('Token tidak valid atau kedaluwarsa.'));
+    next(error);
   }
 }
 
-export function optionalAuthenticate(req, _res, next) {
+export async function optionalAuthenticate(req, _res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     req.user = null;
@@ -34,12 +40,19 @@ export function optionalAuthenticate(req, _res, next) {
   }
 
   const token = authHeader.split(' ')[1];
+  let decoded;
   try {
-    const decoded = verifyToken(token);
-    const user = userRepository.findById(decoded.id);
-    req.user = user || null;
-  } catch (_error) {
+    decoded = verifyToken(token);
+  } catch {
     req.user = null;
+    return next();
+  }
+
+  try {
+    const user = await userRepository.findById(decoded.id);
+    req.user = user || null;
+  } catch (error) {
+    return next(error);
   }
   next();
 }

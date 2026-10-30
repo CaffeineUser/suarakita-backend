@@ -9,7 +9,7 @@ export const categoryService = {
   },
 
   async getCategoryById(id) {
-    const category = categoryRepository.findById(id);
+    const category = await categoryRepository.findById(id);
     if (!category) {
       throw new NotFoundError('Kategori tidak ditemukan.');
     }
@@ -17,7 +17,7 @@ export const categoryService = {
   },
 
   async createCategory({ name, description }) {
-    const existing = categoryRepository.findByName(name);
+    const existing = await categoryRepository.findByName(name);
     if (existing) {
       throw new ConflictError('Kategori dengan nama tersebut sudah ada.');
     }
@@ -25,13 +25,13 @@ export const categoryService = {
   },
 
   async updateCategory(id, { name, description, is_active }) {
-    const category = categoryRepository.findById(id);
+    const category = await categoryRepository.findById(id);
     if (!category) {
       throw new NotFoundError('Kategori tidak ditemukan.');
     }
 
     if (name && name.toLowerCase() !== category.name.toLowerCase()) {
-      const existing = categoryRepository.findByName(name);
+      const existing = await categoryRepository.findByName(name);
       if (existing) {
         throw new ConflictError('Kategori dengan nama tersebut sudah ada.');
       }
@@ -41,12 +41,12 @@ export const categoryService = {
   },
 
   async deleteCategory(id) {
-    const category = categoryRepository.findById(id);
+    const category = await categoryRepository.findById(id);
     if (!category) {
       throw new NotFoundError('Kategori tidak ditemukan.');
     }
 
-    const reportCount = categoryRepository.countReportsByCategoryId(id);
+    const reportCount = await categoryRepository.countReportsByCategoryId(id);
     if (reportCount > 0) {
       throw new ConflictError(
         `Kategori tidak dapat dihapus karena masih digunakan oleh ${reportCount} laporan. Anda dapat menonaktifkannya.`,

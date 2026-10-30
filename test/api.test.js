@@ -9,7 +9,7 @@ const testDirectory = mkdtempSync(join(tmpdir(), 'suarakita-backend-test-'));
 process.env.NODE_ENV = 'test';
 process.env.VERCEL = '1';
 process.env.SEED_DEMO_ACCOUNTS = 'false';
-process.env.DATABASE_PATH = join(testDirectory, 'test.sqlite');
+process.env.TURSO_DATABASE_URL = 'file::memory:';
 process.env.UPLOAD_DIR = join(testDirectory, 'uploads');
 process.env.JWT_SECRET = 'test-only-secret-that-is-long-enough-for-integration-tests';
 process.env.CLIENT_ORIGIN =
@@ -19,7 +19,7 @@ process.env.BOOTSTRAP_ADMIN_EMAIL = 'admin.bootstrap@test.local';
 process.env.BOOTSTRAP_ADMIN_PASSWORD = 'BootstrapAdminTest123!';
 
 const { default: app } = await import('../index.js');
-const { getSharedDatabase } = await import('../src/config/database.js');
+const { getSharedDatabase, queryOne } = await import('../src/config/database.js');
 const { initializeDatabase } = await import('../src/config/initializeDatabase.js');
 const database = getSharedDatabase();
 
@@ -90,50 +90,64 @@ async function createReport({ token = wargaToken, title = 'Laporan Uji Jalan Rus
 before(async () => {
   await initializeDatabase();
 
+  assert.equal((await queryOne(database, 'PRAGMA foreign_keys')).foreign_keys, 1);
   assert.equal(
-    database
-      .prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'users'")
-      .get().count,
+    (await queryOne(
+      database,
+      "SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'users'",
+    )).count,
     1,
     'serverless entry point initializes the database schema',
   );
   assert.equal(
-    database.prepare('SELECT COUNT(*) AS count FROM categories').get().count,
+    (await queryOne(database, 'SELECT COUNT(*) AS count FROM categories')).count,
     4,
     'serverless entry point initializes the default categories',
   );
   assert.equal(
-    database
-      .prepare('SELECT role FROM users WHERE email = ? COLLATE NOCASE')
-      .get('warga@example.com'),
-    undefined,
+    await queryOne(
+      database,
+      'SELECT role FROM users WHERE email = ? COLLATE NOCASE',
+      ['warga@example.com'],
+    ),
+    null,
     'serverless startup does not create public demo accounts by default',
   );
   assert.equal(
-    database
-      .prepare('SELECT role FROM users WHERE email = ? COLLATE NOCASE')
-      .get('admin@example.com'),
-    undefined,
+    await queryOne(
+      database,
+      'SELECT role FROM users WHERE email = ? COLLATE NOCASE',
+      ['admin@example.com'],
+    ),
+    null,
     'serverless startup does not create a public demo admin',
   );
 
   const passwordHash = await bcrypt.hash(wargaPassword, 4);
   const adminPasswordHash = await bcrypt.hash(adminPassword, 4);
-  const insertUser = database.prepare(
-    'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
-  );
-  wargaId = Number(insertUser.run('Warga Uji', 'warga@test.local', passwordHash, 'warga').lastInsertRowid);
-  adminId = Number(insertUser.run('Admin Uji', 'admin@test.local', adminPasswordHash, 'admin').lastInsertRowid);
+  const insertUserSql =
+    'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)';
+  wargaId = Number((await database.execute({
+    sql: insertUserSql,
+    args: ['Warga Uji', 'warga@test.local', passwordHash, 'warga'],
+  })).lastInsertRowid);
+  adminId = Number((await database.execute({
+    sql: insertUserSql,
+    args: ['Admin Uji', 'admin@test.local', adminPasswordHash, 'admin'],
+  })).lastInsertRowid);
   assert.equal(
-    database
-      .prepare('SELECT COUNT(*) AS count FROM users WHERE email = ? COLLATE NOCASE')
-      .get(process.env.BOOTSTRAP_ADMIN_EMAIL).count,
+    (await queryOne(
+      database,
+      'SELECT COUNT(*) AS count FROM users WHERE email = ? COLLATE NOCASE',
+      [process.env.BOOTSTRAP_ADMIN_EMAIL],
+    )).count,
     1,
     'serverless startup seeds the configured admin idempotently',
   );
-  categoryId = database
-    .prepare("SELECT id FROM categories WHERE name = 'Jalan Rusak'")
-    .get().id;
+  categoryId = (await queryOne(
+    database,
+    "SELECT id FROM categories WHERE name = 'Jalan Rusak'",
+  )).id;
 
   server = await new Promise((resolveServer) => {
     const listeningServer = app.listen(0, () => resolveServer(listeningServer));
@@ -148,8 +162,13 @@ after(async () => {
       server.close((error) => (error ? rejectClose(error) : resolveClose()));
     });
   }
-  database.close();
-  rmSync(testDirectory, { recursive: true, force: true });
+  await database.close();
+  rmSync(testDirectory, {
+    recursive: true,
+    force: true,
+    maxRetries: 10,
+    retryDelay: 100,
+  });
 });
 
 test('SuaraKita backend API integration', async (t) => {
@@ -393,10 +412,10 @@ test('SuaraKita backend API integration', async (t) => {
       const registrationError = await assertApiError(registration, 503);
       assert.match(registrationError.error.message, /JWT_SECRET/);
       assert.equal(
-        database
-          .prepare('SELECT 1 FROM users WHERE email = ?')
-          .get('jwt-config-check@test.local'),
-        undefined,
+        await queryOne(database, 'SELECT 1 FROM users WHERE email = ?', [
+          'jwt-config-check@test.local',
+        ]),
+        null,
       );
 
       const login = await jsonRequest('/auth/login', {
@@ -429,10 +448,10 @@ test('SuaraKita backend API integration', async (t) => {
       const registrationError = await assertApiError(registration, 503);
       assert.match(registrationError.error.message, /JWT_EXPIRES_IN/);
       assert.equal(
-        database
-          .prepare('SELECT 1 FROM users WHERE email = ?')
-          .get('jwt-expiry-check@test.local'),
-        undefined,
+        await queryOne(database, 'SELECT 1 FROM users WHERE email = ?', [
+          'jwt-expiry-check@test.local',
+        ]),
+        null,
       );
     } finally {
       process.env.NODE_ENV = originalNodeEnv;
@@ -581,6 +600,7 @@ test('SuaraKita backend API integration', async (t) => {
     const photoResponse = await fetch(`${baseUrl}/reports/${reportId}/photo`);
     assert.equal(photoResponse.status, 200);
     assert.match(photoResponse.headers.get('content-type'), /image\/jpeg/);
+    await photoResponse.arrayBuffer();
 
     const previousPhotoPath = reportDetail.photo_path;
     const newPhoto = new FormData();
@@ -806,7 +826,14 @@ test('SuaraKita backend API integration', async (t) => {
       method: 'DELETE',
     });
     assert.equal(deletion.status, 200);
-    assert.equal(database.prepare('SELECT COUNT(*) AS count FROM reports WHERE id = ?').get(deletableReport.id).count, 0);
+    assert.equal(
+      (await queryOne(
+        database,
+        'SELECT COUNT(*) AS count FROM reports WHERE id = ?',
+        [deletableReport.id],
+      )).count,
+      0,
+    );
     assert.equal(existsSync(photoPath), false);
   });
 });

@@ -7,7 +7,7 @@ export const authService = {
   async register({ name, email, password }) {
     validateJwtConfiguration();
 
-    const existingUser = userRepository.findByEmail(email);
+    const existingUser = await userRepository.findByEmail(email);
     if (existingUser) {
       throw new ConflictError('Email sudah terdaftar. Silakan gunakan email lain atau login.');
     }
@@ -15,7 +15,7 @@ export const authService = {
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    const newUser = userRepository.create({
+    const newUser = await userRepository.create({
       name,
       email,
       passwordHash,
@@ -44,7 +44,7 @@ export const authService = {
   async login({ email, password }) {
     validateJwtConfiguration();
 
-    const user = userRepository.findByEmail(email);
+    const user = await userRepository.findByEmail(email);
     if (!user) {
       throw new UnauthorizedError('Email atau kata sandi tidak valid.');
     }
@@ -74,7 +74,7 @@ export const authService = {
   },
 
   async getMe(userId) {
-    const user = userRepository.findById(userId);
+    const user = await userRepository.findById(userId);
     if (!user) {
       throw new NotFoundError('Pengguna tidak ditemukan.');
     }

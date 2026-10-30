@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
-import { getSharedDatabase } from './database.js';
+import { getSharedDatabase, queryOne } from './database.js';
 
 const backendDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const bootstrapAdminSchema = z.object({
@@ -15,10 +15,11 @@ const bootstrapAdminSchema = z.object({
 export async function initializeDatabase() {
   const database = getSharedDatabase();
 
-  database.exec(
+  await database.execute('PRAGMA foreign_keys = ON');
+  await database.executeMultiple(
     readFileSync(resolve(backendDirectory, 'database/schema.sql'), 'utf8'),
   );
-  database.exec(
+  await database.executeMultiple(
     readFileSync(resolve(backendDirectory, 'database/seed.sql'), 'utf8'),
   );
 
@@ -40,25 +41,22 @@ export async function initializeDatabase() {
         role: 'admin',
       },
     ];
-    const insertDemoUser = database.prepare(`
-      INSERT OR IGNORE INTO users (name, email, password_hash, role)
-      VALUES (?, ?, ?, ?)
-    `);
-    const findDemoUser = database.prepare(
-      'SELECT 1 FROM users WHERE email = ? COLLATE NOCASE',
-    );
-
     for (const demoUser of demoUsers) {
-      if (findDemoUser.get(demoUser.email)) {
+      if (
+        await queryOne(
+          database,
+          'SELECT 1 FROM users WHERE email = ? COLLATE NOCASE',
+          [demoUser.email],
+        )
+      ) {
         continue;
       }
       const passwordHash = await bcrypt.hash(demoUser.password, 10);
-      insertDemoUser.run(
-        demoUser.name,
-        demoUser.email,
-        passwordHash,
-        demoUser.role,
-      );
+      await database.execute({
+        sql: `INSERT OR IGNORE INTO users (name, email, password_hash, role)
+              VALUES (?, ?, ?, ?)`,
+        args: [demoUser.name, demoUser.email, passwordHash, demoUser.role],
+      });
     }
   }
 
@@ -87,9 +85,11 @@ export async function initializeDatabase() {
     );
   }
 
-  const existingAdmin = database
-    .prepare('SELECT role FROM users WHERE email = ? COLLATE NOCASE')
-    .get(parsedAdmin.data.email);
+  const existingAdmin = await queryOne(
+    database,
+    'SELECT role FROM users WHERE email = ? COLLATE NOCASE',
+    [parsedAdmin.data.email],
+  );
 
   if (existingAdmin) {
     if (existingAdmin.role !== 'admin') {
@@ -101,14 +101,13 @@ export async function initializeDatabase() {
   }
 
   const passwordHash = await bcrypt.hash(parsedAdmin.data.password, 12);
-  database
-    .prepare(
-      'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
-    )
-    .run(
+  await database.execute({
+    sql: 'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
+    args: [
       parsedAdmin.data.name,
       parsedAdmin.data.email,
       passwordHash,
       'admin',
-    );
+    ],
+  });
 }

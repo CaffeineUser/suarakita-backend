@@ -8,7 +8,8 @@ const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const schema = readFileSync(resolve(scriptDirectory, '../database/schema.sql'), 'utf8');
 const database = getDatabase();
 
-database.exec(schema);
-database.close();
+await database.execute('PRAGMA foreign_keys = ON');
+await database.executeMultiple(schema);
+await database.close();
 
 console.log('Skema database SuaraKita berhasil disiapkan.');

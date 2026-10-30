@@ -1,6 +1,6 @@
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { getSharedDatabase } from '../config/database.js';
+import { getSharedDatabase, runInTransaction } from '../config/database.js';
 import { getUploadDirectory } from '../config/uploads.js';
 import { categoryRepository } from '../repositories/categoryRepository.js';
 import { reportRepository } from '../repositories/reportRepository.js';
@@ -43,11 +43,11 @@ export const reportService = {
   },
 
   async getReportById(id, currentUserId = null) {
-    const report = reportRepository.findById(id, currentUserId);
+    const report = await reportRepository.findById(id, currentUserId);
     if (!report) {
       throw new NotFoundError('Laporan tidak ditemukan.');
     }
-    const history = statusHistoryRepository.findByReportId(id);
+    const history = await statusHistoryRepository.findByReportId(id);
     return {
       ...report,
       history,
@@ -69,7 +69,7 @@ export const reportService = {
       throw new BadRequestError('Foto laporan wajib diunggah.');
     }
 
-    const category = categoryRepository.findById(categoryId);
+    const category = await categoryRepository.findById(categoryId);
     if (!category || !category.is_active) {
       safeDeleteFile(photoFile.filename);
       throw new BadRequestError('Kategori yang dipilih tidak valid atau tidak aktif.');
@@ -79,40 +79,37 @@ export const reportService = {
     const initialUrgency = urgency || 'sedang';
     const initialPriorityScore = calculatePriorityScore(initialUrgency, 0);
 
-    const runTransaction = db.transaction(() => {
-      const reportId = reportRepository.create(
-        {
-          userId,
-          categoryId,
-          title,
-          description,
-          locationName,
-          latitude,
-          longitude,
-          photoPath: photoFile.filename,
-          urgency: initialUrgency,
-          priorityScore: initialPriorityScore,
-        },
-        db,
-      );
-
-      statusHistoryRepository.create(
-        {
-          reportId,
-          changedBy: userId,
-          oldStatus: null,
-          newStatus: 'diajukan',
-          note: 'Laporan dibuat oleh pelapor.',
-        },
-        db,
-      );
-
-      return reportId;
-    });
-
+    let reportId;
     try {
-      const createdId = runTransaction();
-      return this.getReportById(createdId, userId);
+      await runInTransaction(db, async (transaction) => {
+        reportId = await reportRepository.create(
+          {
+            userId,
+            categoryId,
+            title,
+            description,
+            locationName,
+            latitude,
+            longitude,
+            photoPath: photoFile.filename,
+            urgency: initialUrgency,
+            priorityScore: initialPriorityScore,
+          },
+          transaction,
+        );
+
+        await statusHistoryRepository.create(
+          {
+            reportId,
+            changedBy: userId,
+            oldStatus: null,
+            newStatus: 'diajukan',
+            note: 'Laporan dibuat oleh pelapor.',
+          },
+          transaction,
+        );
+      });
+      return this.getReportById(reportId, userId);
     } catch (error) {
       safeDeleteFile(photoFile.filename);
       throw error;
@@ -120,7 +117,7 @@ export const reportService = {
   },
 
   async updateReport(id, userId, fields) {
-    const report = reportRepository.findById(id);
+    const report = await reportRepository.findById(id);
     if (!report) {
       throw new NotFoundError('Laporan tidak ditemukan.');
     }
@@ -136,7 +133,7 @@ export const reportService = {
     }
 
     if (fields.category_id) {
-      const category = categoryRepository.findById(fields.category_id);
+      const category = await categoryRepository.findById(fields.category_id);
       if (!category || !category.is_active) {
         throw new BadRequestError('Kategori yang dipilih tidak valid atau tidak aktif.');
       }
@@ -147,11 +144,11 @@ export const reportService = {
 
     // Jika urgensi diubah oleh pemilik
     if (fields.urgency && fields.urgency !== report.urgency) {
-      const supportCount = supportRepository.countByReportId(id, db);
+      const supportCount = await supportRepository.countByReportId(id, db);
       updateData.priority_score = calculatePriorityScore(fields.urgency, supportCount);
     }
 
-    reportRepository.update(id, updateData, db);
+    await reportRepository.update(id, updateData, db);
     return this.getReportById(id, userId);
   },
 
@@ -160,7 +157,7 @@ export const reportService = {
       throw new BadRequestError('Foto baru wajib disertakan.');
     }
 
-    const report = reportRepository.findById(id);
+    const report = await reportRepository.findById(id);
     if (!report) {
       safeDeleteFile(newPhotoFile.filename);
       throw new NotFoundError('Laporan tidak ditemukan.');
@@ -180,7 +177,7 @@ export const reportService = {
 
     const oldPhoto = report.photo_path;
     try {
-      reportRepository.update(id, { photo_path: newPhotoFile.filename });
+      await reportRepository.update(id, { photo_path: newPhotoFile.filename });
       if (oldPhoto) {
         safeDeleteFile(oldPhoto);
       }
@@ -192,7 +189,7 @@ export const reportService = {
   },
 
   async deleteReport(id, userId) {
-    const report = reportRepository.findById(id);
+    const report = await reportRepository.findById(id);
     if (!report) {
       throw new NotFoundError('Laporan tidak ditemukan.');
     }
@@ -208,7 +205,7 @@ export const reportService = {
     }
 
     const oldPhoto = report.photo_path;
-    reportRepository.delete(id);
+    await reportRepository.delete(id);
     if (oldPhoto) {
       safeDeleteFile(oldPhoto);
     }
@@ -217,7 +214,7 @@ export const reportService = {
   },
 
   async updateStatus(id, adminId, { status: newStatus, note }) {
-    const report = reportRepository.findById(id);
+    const report = await reportRepository.findById(id);
     if (!report) {
       throw new NotFoundError('Laporan tidak ditemukan.');
     }
@@ -234,9 +231,9 @@ export const reportService = {
     }
 
     const db = getSharedDatabase();
-    const runTransaction = db.transaction(() => {
-      reportRepository.update(id, { status: newStatus }, db);
-      statusHistoryRepository.create(
+    await runInTransaction(db, async (transaction) => {
+      await reportRepository.update(id, { status: newStatus }, transaction);
+      await statusHistoryRepository.create(
         {
           reportId: id,
           changedBy: adminId,
@@ -244,25 +241,23 @@ export const reportService = {
           newStatus,
           note: note || null,
         },
-        db,
+        transaction,
       );
     });
-
-    runTransaction();
     return this.getReportById(id);
   },
 
   async updateUrgency(id, { urgency: newUrgency }) {
-    const report = reportRepository.findById(id);
+    const report = await reportRepository.findById(id);
     if (!report) {
       throw new NotFoundError('Laporan tidak ditemukan.');
     }
 
     const db = getSharedDatabase();
-    const supportCount = supportRepository.countByReportId(id, db);
+    const supportCount = await supportRepository.countByReportId(id, db);
     const newPriorityScore = calculatePriorityScore(newUrgency, supportCount);
 
-    reportRepository.update(
+    await reportRepository.update(
       id,
       {
         urgency: newUrgency,
@@ -275,7 +270,7 @@ export const reportService = {
   },
 
   async getReportHistory(id) {
-    const report = reportRepository.findById(id);
+    const report = await reportRepository.findById(id);
     if (!report) {
       throw new NotFoundError('Laporan tidak ditemukan.');
     }
@@ -283,7 +278,7 @@ export const reportService = {
   },
 
   async getPhotoFilePath(id) {
-    const report = reportRepository.findById(id);
+    const report = await reportRepository.findById(id);
     if (!report) {
       throw new NotFoundError('Laporan tidak ditemukan.');
     }
