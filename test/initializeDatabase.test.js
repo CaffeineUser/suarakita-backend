@@ -6,6 +6,8 @@ const variableNames = [
   'DATABASE_PATH',
   'VERCEL',
   'SEED_DEMO_ACCOUNTS',
+  'DEMO_RESIDENT_PASSWORD',
+  'DEMO_ADMIN_PASSWORD',
   'BOOTSTRAP_ADMIN_EMAIL',
   'BOOTSTRAP_ADMIN_PASSWORD',
   'BOOTSTRAP_ADMIN_NAME',
@@ -32,6 +34,8 @@ async function withDatabase(callback) {
   delete process.env.DATABASE_PATH;
   delete process.env.VERCEL;
   delete process.env.SEED_DEMO_ACCOUNTS;
+  delete process.env.DEMO_RESIDENT_PASSWORD;
+  delete process.env.DEMO_ADMIN_PASSWORD;
   delete process.env.BOOTSTRAP_ADMIN_EMAIL;
   delete process.env.BOOTSTRAP_ADMIN_PASSWORD;
   delete process.env.BOOTSTRAP_ADMIN_NAME;
@@ -61,6 +65,16 @@ describe('initializeDatabase configuration', () => {
         'SELECT role FROM users WHERE email = ?',
         ['admin@example.com'],
       )).toMatchObject({ role: 'admin' });
+    });
+
+    await withDatabase(async ({ database, initializeDatabase, queryOne }) => {
+      process.env.SEED_DEMO_ACCOUNTS = 'true';
+      process.env.DEMO_RESIDENT_PASSWORD = 'CustomResidentPassword123!';
+      process.env.DEMO_ADMIN_PASSWORD = 'CustomAdminPassword123!';
+      await initializeDatabase();
+
+      expect(await queryOne(database, 'SELECT COUNT(*) AS total FROM users'))
+        .toMatchObject({ total: 2 });
     });
   });
 

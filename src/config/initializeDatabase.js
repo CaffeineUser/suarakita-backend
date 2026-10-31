@@ -27,17 +27,22 @@ export async function initializeDatabase() {
     process.env.SEED_DEMO_ACCOUNTS?.toLowerCase() === 'true';
 
   if (seedDemoAccounts) {
+    const demoResidentPassword =
+      process.env.DEMO_RESIDENT_PASSWORD || 'WargaDemo123!';
+    const demoAdminPassword =
+      process.env.DEMO_ADMIN_PASSWORD || 'AdminDemo123!';
+
     const demoUsers = [
       {
         name: 'Warga Demo',
         email: 'warga@example.com',
-        password: 'WargaDemo123!',
+        password: demoResidentPassword,
         role: 'warga',
       },
       {
         name: 'Admin Demo',
         email: 'admin@example.com',
-        password: 'AdminDemo123!',
+        password: demoAdminPassword,
         role: 'admin',
       },
     ];
