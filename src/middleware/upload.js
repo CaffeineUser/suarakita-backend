@@ -9,7 +9,7 @@ const uploadDir = getUploadDirectory();
 
 export function ensureUploadDir(dir = uploadDir) {
   if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
   }
 }
 ensureUploadDir();
