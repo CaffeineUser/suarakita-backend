@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import bcrypt from 'bcryptjs';
-import { after, before, test } from 'node:test';
+import { afterAll, beforeAll, describe, test } from 'vitest';
 
 const testDirectory = mkdtempSync(join(tmpdir(), 'suarakita-backend-test-'));
 process.env.NODE_ENV = 'test';
@@ -87,7 +87,7 @@ async function createReport({ token = wargaToken, title = 'Laporan Uji Jalan Rus
   return (await responseJson(response)).data;
 }
 
-before(async () => {
+beforeAll(async () => {
   await initializeDatabase();
 
   assert.equal((await queryOne(database, 'PRAGMA foreign_keys')).foreign_keys, 1);
@@ -156,7 +156,7 @@ before(async () => {
   baseUrl = `http://127.0.0.1:${address.port}/api/v1`;
 });
 
-after(async () => {
+afterAll(async () => {
   if (server) {
     await new Promise((resolveClose, rejectClose) => {
       server.close((error) => (error ? rejectClose(error) : resolveClose()));
@@ -171,8 +171,8 @@ after(async () => {
   });
 });
 
-test('SuaraKita backend API integration', async (t) => {
-  await t.test('health check, not-found, and error responses', async () => {
+describe('SuaraKita backend API integration', () => {
+  test('health check, not-found, and error responses', async () => {
     assert.equal(app.get('trust proxy'), 1);
 
     const rootResponse = await fetch(baseUrl.replace('/api/v1', '/'), {
@@ -254,7 +254,7 @@ test('SuaraKita backend API integration', async (t) => {
     await assertApiError(invalidJson, 400);
   });
 
-  await t.test('registration, login, authentication, and profile endpoints', async () => {
+  test('registration, login, authentication, and profile endpoints', async () => {
     const invalidRegistration = await jsonRequest('/auth/register', {
       method: 'POST',
       body: { name: 'x', email: 'bukan-email', password: 'short' },
@@ -394,7 +394,7 @@ test('SuaraKita backend API integration', async (t) => {
     assert.equal(logout.status, 200);
   });
 
-  await t.test('missing production JWT secret fails before registration writes a user', async () => {
+  test('missing production JWT secret fails before registration writes a user', async () => {
     const originalNodeEnv = process.env.NODE_ENV;
     const originalJwtSecret = process.env.JWT_SECRET;
     process.env.NODE_ENV = 'production';
@@ -430,7 +430,7 @@ test('SuaraKita backend API integration', async (t) => {
     }
   });
 
-  await t.test('invalid production JWT expiration fails before registration writes a user', async () => {
+  test('invalid production JWT expiration fails before registration writes a user', async () => {
     const originalNodeEnv = process.env.NODE_ENV;
     const originalJwtExpiresIn = process.env.JWT_EXPIRES_IN;
     process.env.NODE_ENV = 'production';
@@ -460,7 +460,7 @@ test('SuaraKita backend API integration', async (t) => {
     }
   });
 
-  await t.test('category listing, authorization, CRUD, and conflict handling', async () => {
+  test('category listing, authorization, CRUD, and conflict handling', async () => {
     const publicCategories = await jsonRequest('/categories');
     assert.equal(publicCategories.status, 200);
     assert.ok((await responseJson(publicCategories)).data.some((item) => item.id === categoryId));
@@ -521,7 +521,7 @@ test('SuaraKita backend API integration', async (t) => {
     assert.equal(deleted.status, 200);
   });
 
-  await t.test('report upload, validation, listing, filtering, and update', async () => {
+  test('report upload, validation, listing, filtering, and update', async () => {
     const noPhoto = await multipartRequest('/reports', {
       token: wargaToken,
       photoName: null,
@@ -640,7 +640,7 @@ test('SuaraKita backend API integration', async (t) => {
     await assertApiError(await jsonRequest('/reports/99999/history'), 404);
   });
 
-  await t.test('support actions preserve unique support and priority score', async () => {
+  test('support actions preserve unique support and priority score', async () => {
     await assertApiError(
       await jsonRequest(`/reports/${reportId}/supports`, {
         token: wargaToken,
@@ -690,7 +690,7 @@ test('SuaraKita backend API integration', async (t) => {
     );
   });
 
-  await t.test('admin status/urgency changes, history, and terminal rules', async () => {
+  test('admin status/urgency changes, history, and terminal rules', async () => {
     await assertApiError(
       await jsonRequest(`/reports/${reportId}/status`, {
         token: wargaToken,
@@ -778,7 +778,7 @@ test('SuaraKita backend API integration', async (t) => {
     assert.equal(history[1].note, 'Penanganan dimulai.');
   });
 
-  await t.test('dashboard endpoints are admin-only and return consistent aggregates', async () => {
+  test('dashboard endpoints are admin-only and return consistent aggregates', async () => {
     for (const endpoint of ['/dashboard/summary', '/dashboard/by-category', '/dashboard/by-status', '/dashboard/priority']) {
       await assertApiError(await jsonRequest(endpoint, { token: wargaToken }), 403);
     }
@@ -805,7 +805,7 @@ test('SuaraKita backend API integration', async (t) => {
     assert.ok(priorityData.every((item, index) => index === 0 || priorityData[index - 1].priority_score >= item.priority_score));
   });
 
-  await t.test('report deletion enforces ownership and removes uploaded photo', async () => {
+  test('report deletion enforces ownership and removes uploaded photo', async () => {
     await assertApiError(
       await jsonRequest(`/reports/${reportId}`, { token: wargaToken, method: 'DELETE' }),
       403,

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
 import { resolve } from 'node:path';
+import { test } from 'vitest';
 import { getUploadDirectory } from '../src/config/uploads.js';
 
 test('upload directory uses /tmp by default on Vercel', () => {
