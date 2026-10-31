@@ -34,7 +34,7 @@ export async function authenticate(req, _res, next) {
 
 export async function optionalAuthenticate(req, _res, next) {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!authHeader?.startsWith('Bearer ')) {
     req.user = null;
     return next();
   }
