@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
 const urgencyEnum = z.enum(['rendah', 'sedang', 'tinggi', 'kritis'], {
-  errorMap: () => ({ message: "Tingkat urgensi harus salah satu dari: 'rendah', 'sedang', 'tinggi', atau 'kritis'." }),
+  error: () => "Tingkat urgensi harus salah satu dari: 'rendah', 'sedang', 'tinggi', atau 'kritis'.",
 });
 
 const statusEnum = z.enum(['diajukan', 'diverifikasi', 'diproses', 'selesai', 'ditolak'], {
-  errorMap: () => ({ message: "Status harus salah satu dari: 'diajukan', 'diverifikasi', 'diproses', 'selesai', atau 'ditolak'." }),
+  error: () => "Status harus salah satu dari: 'diajukan', 'diverifikasi', 'diproses', 'selesai', atau 'ditolak'.",
 });
 
 export const createReportSchema = z.object({

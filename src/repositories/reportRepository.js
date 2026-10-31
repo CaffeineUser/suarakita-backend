@@ -119,7 +119,7 @@ export const reportRepository = {
        LIMIT ? OFFSET ?`,
       [...selectArgs, ...filterArgs, limit, offset],
     );
-    const totalPages = Math.ceil(total / limit) || (total === 0 ? 0 : 1);
+    const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
 
     return {
       data: rows.map(formatReport),

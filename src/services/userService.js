@@ -46,7 +46,7 @@ export const userService = {
       userRepository.findAll({ limit, offset }),
       userRepository.countAll(),
     ]);
-    const totalPages = Math.ceil(total / limit) || (total === 0 ? 0 : 1);
+    const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
 
     return {
       data: users,

@@ -25,7 +25,7 @@ const ALLOWED_STATUS_TRANSITIONS = {
   ditolak: [],
 };
 
-function safeDeleteFile(filename) {
+export function safeDeleteFile(filename) {
   if (!filename) return;
   try {
     const filePath = resolve(uploadDir, filename);

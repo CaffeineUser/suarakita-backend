@@ -6,7 +6,13 @@ import { getUploadDirectory } from '../config/uploads.js';
 import { BadRequestError } from '../utils/errors.js';
 
 const uploadDir = getUploadDirectory();
-if (!existsSync(uploadDir)) mkdirSync(uploadDir, { recursive: true });
+
+export function ensureUploadDir(dir = uploadDir) {
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
+}
+ensureUploadDir();
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
