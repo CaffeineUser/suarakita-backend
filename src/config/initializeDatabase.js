@@ -8,7 +8,7 @@ import { getSharedDatabase, queryOne } from './database.js';
 const backendDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const bootstrapAdminSchema = z.object({
   name: z.string().trim().min(3).max(100),
-  email: z.string().trim().email().max(255),
+  email: z.string().trim().email({ error: 'Format email tidak valid.' }).max(255),
   password: z.string().min(12).max(100),
 });
 

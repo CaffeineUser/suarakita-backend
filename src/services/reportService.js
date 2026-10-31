@@ -70,7 +70,7 @@ export const reportService = {
     }
 
     const category = await categoryRepository.findById(categoryId);
-    if (!category || !category.is_active) {
+    if (!category?.is_active) {
       safeDeleteFile(photoFile.filename);
       throw new BadRequestError('Kategori yang dipilih tidak valid atau tidak aktif.');
     }
@@ -134,7 +134,7 @@ export const reportService = {
 
     if (fields.category_id) {
       const category = await categoryRepository.findById(fields.category_id);
-      if (!category || !category.is_active) {
+      if (!category?.is_active) {
         throw new BadRequestError('Kategori yang dipilih tidak valid atau tidak aktif.');
       }
     }

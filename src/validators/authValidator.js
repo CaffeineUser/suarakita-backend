@@ -9,7 +9,7 @@ export const registerSchema = z.object({
   email: z
     .string({ required_error: 'Email wajib diisi.' })
     .trim()
-    .email('Format email tidak valid.')
+    .email({ error: 'Format email tidak valid.' })
     .max(255, 'Email maksimal 255 karakter.'),
   password: z
     .string({ required_error: 'Kata sandi wajib diisi.' })
@@ -21,7 +21,7 @@ export const loginSchema = z.object({
   email: z
     .string({ required_error: 'Email wajib diisi.' })
     .trim()
-    .email('Format email tidak valid.'),
+    .email({ error: 'Format email tidak valid.' }),
   password: z
     .string({ required_error: 'Kata sandi wajib diisi.' })
     .min(1, 'Kata sandi wajib diisi.'),

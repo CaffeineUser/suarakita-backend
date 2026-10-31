@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import { BadRequestError } from '../utils/errors.js';
 
 export function validateBody(schema) {

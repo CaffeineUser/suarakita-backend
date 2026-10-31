@@ -4,7 +4,7 @@ import { verifyToken } from '../utils/jwt.js';
 
 export async function authenticate(req, _res, next) {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!authHeader?.startsWith('Bearer ')) {
     return next(new UnauthorizedError('Akses ditolak. Token otorisasi tidak ditemukan.'));
   }
 

@@ -16,7 +16,7 @@ function getJwtSecret() {
 
 function getJwtExpiresIn() {
   const expiresIn = process.env.JWT_EXPIRES_IN?.trim() || '1d';
-  if (!/^[1-9]\d*(s|m|h|d)$/i.test(expiresIn)) {
+  if (!/^[1-9]\d*[smhd]$/i.test(expiresIn)) {
     if (process.env.NODE_ENV === 'production') {
       throw new ServiceUnavailableError(
         'JWT_EXPIRES_IN tidak valid. Gunakan durasi positif seperti 1d, 12h, atau 30m.',
