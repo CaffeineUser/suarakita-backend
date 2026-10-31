@@ -3,14 +3,14 @@ import {
   validateBody,
   validateParams,
   validateQuery,
-} from '../src/middleware/validate.js';
+} from '../middleware/validate.js';
 import {
   createReportSchema,
   queryReportsSchema,
   updateReportSchema,
   updateStatusSchema,
   updateUrgencySchema,
-} from '../src/validators/reportValidator.js';
+} from '../validators/reportValidator.js';
 
 function runValidator(validator, input) {
   const request = { ...input };

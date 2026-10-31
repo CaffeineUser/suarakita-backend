@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import multer from 'multer';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { errorHandler } from '../src/middleware/errorHandler.js';
+import { errorHandler } from '../middleware/errorHandler.js';
 import {
   AppError,
   BadRequestError,
   NotFoundError,
-} from '../src/utils/errors.js';
+} from '../utils/errors.js';
 
 function createResponse() {
   const response = {

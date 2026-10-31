@@ -8,7 +8,7 @@ import {
   ServiceUnavailableError,
   UnauthorizedError,
   UnprocessableEntityError,
-} from '../src/utils/errors.js';
+} from '../utils/errors.js';
 
 describe('application error types', () => {
   test.each([

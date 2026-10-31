@@ -41,8 +41,8 @@ async function withDatabase(callback) {
   delete process.env.BOOTSTRAP_ADMIN_NAME;
   vi.resetModules();
 
-  const { getSharedDatabase, queryOne } = await import('../src/config/database.js');
-  const { initializeDatabase } = await import('../src/config/initializeDatabase.js');
+  const { getSharedDatabase, queryOne } = await import('../config/database.js');
+  const { initializeDatabase } = await import('../config/initializeDatabase.js');
   const database = getSharedDatabase();
   try {
     await callback({ database, initializeDatabase, queryOne });

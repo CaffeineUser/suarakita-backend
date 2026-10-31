@@ -3,7 +3,7 @@ import {
   generateToken,
   validateJwtConfiguration,
   verifyToken,
-} from '../src/utils/jwt.js';
+} from '../utils/jwt.js';
 
 const originalEnv = {
   nodeEnv: process.env.NODE_ENV,

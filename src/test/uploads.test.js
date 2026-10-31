@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { test } from 'vitest';
-import { getUploadDirectory } from '../src/config/uploads.js';
+import { getUploadDirectory } from '../config/uploads.js';
 
 test('upload directory uses /tmp by default on Vercel', () => {
   const originalVercel = process.env.VERCEL;
@@ -10,7 +11,7 @@ test('upload directory uses /tmp by default on Vercel', () => {
   try {
     process.env.VERCEL = '1';
     delete process.env.UPLOAD_DIR;
-    assert.equal(getUploadDirectory(), resolve('/tmp/suarakita-uploads'));
+    assert.equal(getUploadDirectory(), resolve(join(tmpdir(), 'suarakita-uploads')));
   } finally {
     if (originalVercel === undefined) delete process.env.VERCEL;
     else process.env.VERCEL = originalVercel;
@@ -38,7 +39,7 @@ test('upload directory respects explicit configuration', () => {
 });
 
 test('upload middleware handles storage, fallback extensions, and file filters', async () => {
-  const { ensureUploadDir, uploadPhoto } = await import('../src/middleware/upload.js');
+  const { ensureUploadDir, uploadPhoto } = await import('../middleware/upload.js');
   const { mkdtempSync, rmSync, existsSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');

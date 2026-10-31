@@ -12,20 +12,20 @@ process.env.TURSO_DATABASE_URL = 'file::memory:';
 process.env.UPLOAD_DIR = join(testDir, 'uploads');
 process.env.JWT_SECRET = 'test-only-secret-that-is-long-enough-for-integration-tests';
 
-const { getSharedDatabase } = await import('../src/config/database.js');
-const { initializeDatabase } = await import('../src/config/initializeDatabase.js');
-const { categoryRepository } = await import('../src/repositories/categoryRepository.js');
-const { dashboardRepository } = await import('../src/repositories/dashboardRepository.js');
-const { reportRepository } = await import('../src/repositories/reportRepository.js');
-const { statusHistoryRepository } = await import('../src/repositories/statusHistoryRepository.js');
-const { supportRepository } = await import('../src/repositories/supportRepository.js');
-const { userRepository } = await import('../src/repositories/userRepository.js');
-const { authService } = await import('../src/services/authService.js');
-const { categoryService } = await import('../src/services/categoryService.js');
-const { reportService, safeDeleteFile } = await import('../src/services/reportService.js');
-const { supportService } = await import('../src/services/supportService.js');
-const { userService } = await import('../src/services/userService.js');
-import * as databaseModule from '../src/config/database.js';
+const { getSharedDatabase } = await import('../config/database.js');
+const { initializeDatabase } = await import('../config/initializeDatabase.js');
+const { categoryRepository } = await import('../repositories/categoryRepository.js');
+const { dashboardRepository } = await import('../repositories/dashboardRepository.js');
+const { reportRepository } = await import('../repositories/reportRepository.js');
+const { statusHistoryRepository } = await import('../repositories/statusHistoryRepository.js');
+const { supportRepository } = await import('../repositories/supportRepository.js');
+const { userRepository } = await import('../repositories/userRepository.js');
+const { authService } = await import('../services/authService.js');
+const { categoryService } = await import('../services/categoryService.js');
+const { reportService, safeDeleteFile } = await import('../services/reportService.js');
+const { supportService } = await import('../services/supportService.js');
+const { userService } = await import('../services/userService.js');
+import * as databaseModule from '../config/database.js';
 
 let testUser;
 let secondUser;
@@ -249,7 +249,7 @@ describe('Report Repository & Service coverage branches', () => {
     safeDeleteFile('definitely-not-existent-file-1234.jpg');
 
     // real file deletion
-    const { getUploadDirectory } = await import('../src/config/uploads.js');
+    const { getUploadDirectory } = await import('../config/uploads.js');
     const { mkdirSync } = await import('node:fs');
     const uploadDirectory = getUploadDirectory();
     if (!existsSync(uploadDirectory)) mkdirSync(uploadDirectory, { recursive: true });

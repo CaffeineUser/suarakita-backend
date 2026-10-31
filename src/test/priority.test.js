@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'vitest';
-import { calculatePriorityScore } from '../src/utils/priority.js';
+import { calculatePriorityScore } from '../utils/priority.js';
 
 test('calculatePriorityScore calculates each urgency weight with zero supports', () => {
   assert.equal(calculatePriorityScore('rendah'), 15);

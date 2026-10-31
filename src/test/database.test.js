@@ -43,7 +43,7 @@ describe('database configuration', () => {
   test('requires a remote Turso auth token', async () => {
     process.env.TURSO_DATABASE_URL = 'libsql://example.turso.io';
     delete process.env.TURSO_AUTH_TOKEN;
-    const { getDatabase } = await import('../src/config/database.js');
+    const { getDatabase } = await import('../config/database.js');
     expect(() => getDatabase()).toThrow('TURSO_AUTH_TOKEN wajib diatur');
   });
 
@@ -51,7 +51,7 @@ describe('database configuration', () => {
     delete process.env.TURSO_DATABASE_URL;
     delete process.env.DATABASE_PATH;
     process.env.VERCEL = '1';
-    const { getDatabase } = await import('../src/config/database.js');
+    const { getDatabase } = await import('../config/database.js');
     expect(() => getDatabase()).toThrow('TURSO_DATABASE_URL wajib diatur');
   });
 
@@ -60,7 +60,7 @@ describe('database configuration', () => {
     delete process.env.TURSO_AUTH_TOKEN;
     delete process.env.VERCEL;
     process.env.DATABASE_PATH = './local-test.sqlite';
-    const { getDatabase } = await import('../src/config/database.js');
+    const { getDatabase } = await import('../config/database.js');
 
     getDatabase();
 
@@ -75,7 +75,7 @@ describe('database configuration', () => {
     delete process.env.TURSO_AUTH_TOKEN;
     delete process.env.DATABASE_PATH;
     delete process.env.VERCEL;
-    const { getDatabase } = await import('../src/config/database.js');
+    const { getDatabase } = await import('../config/database.js');
 
     getDatabase();
 
@@ -90,7 +90,7 @@ describe('database configuration', () => {
     delete process.env.TURSO_AUTH_TOKEN;
     process.env.VERCEL = '1';
     process.env.DATABASE_PATH = 'custom.sqlite';
-    const { getDatabase } = await import('../src/config/database.js');
+    const { getDatabase } = await import('../config/database.js');
 
     getDatabase();
 
@@ -103,7 +103,7 @@ describe('database configuration', () => {
   test('creates an authenticated remote client when URL and token are configured', async () => {
     process.env.TURSO_DATABASE_URL = 'libsql://example.turso.io';
     process.env.TURSO_AUTH_TOKEN = 'test-token';
-    const { getDatabase } = await import('../src/config/database.js');
+    const { getDatabase } = await import('../config/database.js');
 
     getDatabase();
 
@@ -117,7 +117,7 @@ describe('database configuration', () => {
   test('supports local libSQL URLs and trims environment values', async () => {
     process.env.TURSO_DATABASE_URL = ' file::memory: ';
     process.env.TURSO_AUTH_TOKEN = ' ';
-    const { getDatabase } = await import('../src/config/database.js');
+    const { getDatabase } = await import('../config/database.js');
 
     getDatabase();
 
@@ -135,7 +135,7 @@ describe('database configuration', () => {
       getSharedDatabase,
       queryAll,
       queryOne,
-    } = await import('../src/config/database.js');
+    } = await import('../config/database.js');
     const database = getSharedDatabase();
     expect(getSharedDatabase()).toBe(database);
     await executeSql(database, 'SELECT 1');
@@ -152,7 +152,7 @@ describe('database configuration', () => {
       rollback: vi.fn().mockResolvedValue(undefined),
     };
     const database = { transaction: vi.fn().mockResolvedValue(transaction) };
-    const { runInTransaction } = await import('../src/config/database.js');
+    const { runInTransaction } = await import('../config/database.js');
 
     await expect(runInTransaction(database, async () => 'committed')).resolves.toBe(
       'committed',
@@ -176,7 +176,7 @@ describe('database configuration', () => {
     const database = {
       transaction: vi.fn().mockResolvedValue(transaction),
     };
-    const { runInTransaction } = await import('../src/config/database.js');
+    const { runInTransaction } = await import('../config/database.js');
     await expect(
       runInTransaction(database, async () => {
         throw new Error('work failed');

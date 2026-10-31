@@ -18,9 +18,9 @@ process.env.BOOTSTRAP_ADMIN_NAME = 'Admin SuaraKita';
 process.env.BOOTSTRAP_ADMIN_EMAIL = 'admin.bootstrap@test.local';
 process.env.BOOTSTRAP_ADMIN_PASSWORD = 'BootstrapAdminTest123!';
 
-const { default: app } = await import('../index.js');
-const { getSharedDatabase, queryOne } = await import('../src/config/database.js');
-const { initializeDatabase } = await import('../src/config/initializeDatabase.js');
+const { default: app } = await import('../../index.js');
+const { getSharedDatabase, queryOne } = await import('../config/database.js');
+const { initializeDatabase } = await import('../config/initializeDatabase.js');
 const database = getSharedDatabase();
 
 let server;

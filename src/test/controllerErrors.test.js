@@ -1,16 +1,16 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { authController } from '../src/controllers/authController.js';
-import { categoryController } from '../src/controllers/categoryController.js';
-import { dashboardController } from '../src/controllers/dashboardController.js';
-import { reportController } from '../src/controllers/reportController.js';
-import { supportController } from '../src/controllers/supportController.js';
-import { userController } from '../src/controllers/userController.js';
-import { authService } from '../src/services/authService.js';
-import { categoryService } from '../src/services/categoryService.js';
-import { dashboardService } from '../src/services/dashboardService.js';
-import { reportService } from '../src/services/reportService.js';
-import { supportService } from '../src/services/supportService.js';
-import { userService } from '../src/services/userService.js';
+import { authController } from '../controllers/authController.js';
+import { categoryController } from '../controllers/categoryController.js';
+import { dashboardController } from '../controllers/dashboardController.js';
+import { reportController } from '../controllers/reportController.js';
+import { supportController } from '../controllers/supportController.js';
+import { userController } from '../controllers/userController.js';
+import { authService } from '../services/authService.js';
+import { categoryService } from '../services/categoryService.js';
+import { dashboardService } from '../services/dashboardService.js';
+import { reportService } from '../services/reportService.js';
+import { supportService } from '../services/supportService.js';
+import { userService } from '../services/userService.js';
 
 const request = {
   body: {},

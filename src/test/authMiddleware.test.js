@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
-import { authenticate, authorize, optionalAuthenticate } from '../src/middleware/auth.js';
-import { userRepository } from '../src/repositories/userRepository.js';
+import { authenticate, authorize, optionalAuthenticate } from '../middleware/auth.js';
+import { userRepository } from '../repositories/userRepository.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
